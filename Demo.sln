@@ -1,0 +1,18 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.6
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Demo", "src\Demo.fsproj", "{223372E6-D2A2-47C0-94BC-CA7AB576EEEF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{223372E6-D2A2-47C0-94BC-CA7AB576EEEF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{223372E6-D2A2-47C0-94BC-CA7AB576EEEF}.Debug|x64.Build.0 = Debug|Any CPU
+		{223372E6-D2A2-47C0-94BC-CA7AB576EEEF}.Release|x64.ActiveCfg = Release|Any CPU
+		{223372E6-D2A2-47C0-94BC-CA7AB576EEEF}.Release|x64.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
