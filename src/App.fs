@@ -8,14 +8,10 @@ open Aardvark.UI.Primitives
 open Aardvark.Base.Rendering
 open Aardvark.Rendering.Text
 open Aardvark.Data.Photometry
+open FShade
    
 module App =
-    open Microsoft.FSharp
-    open Microsoft.FSharp.Reflection
-    open Aardvark.UI.Primitives.SimplePrimitives
-    open Aardvark.Base
-    open FShade
-    
+        
     let initLightTransform = Trafo3d.RotationX(Constant.PiHalf) * Trafo3d.Translation(0.0, 0.0, 0.7)
     let initLightPolygon = Polygon2d(V2d(-0.5, -0.5), V2d(0.5, -0.5), V2d(0.5,  0.5), V2d(-0.5,  0.5))
     let translationStepSize = 0.1
@@ -49,6 +45,18 @@ module App =
             | SetDiffuseExitance d -> { m with diffuseExitance = d }
 
             | CameraMessage msg ->
+                // perform fake update for continuous rendering when in Reference or Difference render mode
+                // a dependency to clientValues.time is used, but it is only updated as long as any messages are processed
+                let m = 
+                    if m.renderMode = RenderMode.Reference || m.renderMode = RenderMode.Difference then 
+                        match msg with 
+                        | FreeFlyController.Rendered -> 
+                            let fakeUpdate = m.cameraState.view.WithLocation(m.cameraState.view.Location)
+                            { m with cameraState = { m.cameraState with view = fakeUpdate } }
+                        | _ -> m
+                    else
+                        m
+                // forward camera messages
                 { m with cameraState = FreeFlyController.update m.cameraState msg }
 
             | SetExposure v -> { m with exposure = v }

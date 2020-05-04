@@ -116,10 +116,10 @@ module Reference =
                 let u1 = u.X
                 let u2 = u.Y
 
+                // NOTE: this techqniue has difficuties at the poylgon horizon because the ray intersections becomes unstable 
+                //       and dotOut/cos(theta) is almost 0
                 if samplingMethod = ReferenceSamplingMode.BRDF then
-                                
-                    //let i = sampleHemisphere u1 u2                
-
+                                   
                     let i = cosineSampleHemisphere u1 u2
 
                     let t1 = rayTriangleIntersaction V3d.Zero i vt.[0] vt.[1] vt.[2]
@@ -129,12 +129,10 @@ module Reference =
                         hitLight <- t2 > 1e-8
 
                     if hitLight then
-                        //let dotIn = i.Z
                         //let samplePDF = dotIn / Pi // cosine hemisphere sampling pdf
                         let invPdf = Constant.Pi // NOTE: dotIn cancelled, Pi will actually also cancel by *brdf
 
                         let worldI = t2w * -i
-                        let dotOut = max 1e-9 (abs (Vec.dot worldI uniform.PolygonNormal))
                                 
                         let I = Photometry.getRadiance_World worldI usePhotometry // includes divisiion by dotOut
                         let Le = I / uniform.PolygonArea

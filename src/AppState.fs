@@ -2,9 +2,7 @@
 
 open System
 open Aardvark.Base
-open FSharp.Data.Adaptive
 open Aardvark.UI.Primitives
-open Aardvark.UI
 open Aardvark.Data.Photometry
 open Adaptify
 
@@ -13,7 +11,7 @@ type ExposureMode = Manual=0 | MiddleGray=1 | Auto=2
 type RenderMode =
     | Reference = 0
     | Cubature = 1
-    | Compare = 2
+    | Difference = 2
 
 type ReferenceSamplingMode =
     | BRDF = 0

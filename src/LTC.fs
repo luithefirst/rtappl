@@ -3,13 +3,13 @@
 open Aardvark.Base
 open FShade
 open EffectUtils
+open Aardvark.UI
 
 (*
     Module providing Linearly Transformed Cosines
     https://eheitzresearch.wordpress.com/415-2/
 *)
 module LTC = 
-    open Aardvark.UI
 
     let LTCAmplitudeTexture  = TypedSymbol<ITexture>("LTCAmplitudeTexture")    
     let LTCMatrixTexture     = TypedSymbol<ITexture>("LTCMatrixTexture")  

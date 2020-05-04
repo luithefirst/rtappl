@@ -1,5 +1,7 @@
 ﻿namespace Demo 
 
+open FShade
+
 module RenderUtils =
 
     open Aardvark.SceneGraph
@@ -180,7 +182,130 @@ module RenderUtils =
 
         RenderTask.renderTo fbo sceneTaskWithClear
             |> RenderTask.getResult DefaultSemantic.Colors
-            
+      
+    let screenQuad : ISg<Message> =
+        let drawCall = DrawCallInfo(4)
+        let positions = [| V3f(-1,-1,0); V3f(1,-1,0); V3f(-1,1,0); V3f(1,1,0) |]
+        let texcoords = [| V2f(0,0); V2f(1,0); V2f(0,1); V2f(1,1) |]
+
+        drawCall
+            |> Sg.render IndexedGeometryMode.TriangleStrip 
+            |> Sg.vertexAttribute DefaultSemantic.Positions (AVal.constant positions)
+            |> Sg.vertexAttribute DefaultSemantic.DiffuseColorCoordinates (AVal.constant texcoords)
+
+    let createTonemapSg (m : AdaptiveModel) (clientValues : Aardvark.Service.ClientValues) (intputTexture : aval<ITexture>) = 
+
+        let lumSig = clientValues.runtime.CreateFramebufferSignature(1, [
+            DefaultSemantic.Colors, RenderbufferFormat.R32f; 
+            ]
+        )  
+                                    
+        let lumInitTask = screenQuad 
+                        |> Sg.shader { do! ToneMapping.lumInit }
+                        |> Sg.uniform "SceneTexture" intputTexture
+                        |> Aardvark.SceneGraph.RuntimeSgExtensions.Sg.compile clientValues.runtime lumSig
+
+        let lumTex =
+            OutputMod.custom 
+                []
+                (fun t -> 
+                    let sz = clientValues.size.GetValue t
+                    let mipCnt = Fun.Log2Int(float sz.NormMax) // TODO: use int overload of next Aardvark.Base version
+                    clientValues.runtime.CreateTexture(sz, TextureFormat.R32f, mipCnt, 1))
+                (fun t h -> false)
+                (fun h -> clientValues.runtime.DeleteTexture h)
+                id
+
+        let lumFbo = 
+            OutputMod.custom 
+                []
+                (fun t -> 
+                    let tex = lumTex.GetValue t
+                    clientValues.runtime.CreateFramebuffer(lumSig,
+                        Map.ofList [
+                            DefaultSemantic.Colors, tex.GetOutputView(0, 0)
+                        ]))
+                (fun t h -> false)
+                (fun h -> clientValues.runtime.DeleteFramebuffer h)
+                id
+
+        let lumTex = RenderTask.custom(fun (self, rt, out) ->
+                                            lumInitTask.Run(rt, out)
+                                            let outColorTex = out.framebuffer.Attachments.[DefaultSemantic.Colors] :?> BackendTextureOutputView
+                                            clientValues.runtime.GenerateMipMaps(outColorTex.texture)
+                                        )
+                                |> RenderTask.renderTo lumFbo
+                                |> RenderTask.getResult DefaultSemantic.Colors
+
+        screenQuad
+            |> Sg.shader {
+                    do! ToneMapping.tonemap
+                }
+            |> Sg.uniform "SceneTexture" intputTexture
+            |> Sg.uniform "LumTexture" lumTex
+            |> Sg.uniform "ExposureMode" m.exposureMode
+            |> Sg.uniform "MiddleGray" m.key
+            |> Sg.uniform "Exposure" m.exposure
+            |> Sg.depthTest (AVal.constant DepthTestMode.None)
+
+    type Vertex = {
+        [<TexCoord>] tc : V2d
+    }
+
+    let  imageTest =
+        sampler2d {
+            texture uniform?ImageTest
+            filter Filter.MinMagMipPoint
+            addressU FShade.WrapMode.Wrap
+            addressV FShade.WrapMode.Wrap
+        }
+
+    let imageRef =
+        sampler2d {
+            texture uniform?ImageRef
+            filter Filter.MinMagMipPoint
+            addressU FShade.WrapMode.Wrap
+            addressV FShade.WrapMode.Wrap
+        }
+
+    let luminanceVec = V3d(0.2126f, 0.7152f, 0.0722f) // CIE XYZ D65
+
+    let differenceEffect (v : Vertex) =
+        fragment {
+            let imageTest = imageTest.Sample(v.tc).XYZ
+            let imageRef = imageRef.Sample(v.tc).XYZ
+
+            let lumTest = Vec.dot imageTest luminanceVec
+            let lumRef = Vec.dot imageRef luminanceVec
+
+            let error = lumTest - lumRef
+            let sign = sign error
+            let error = abs error
+
+            let upp1 = 0.5
+            let b1 = V3d(1.0, 0.5089, 0.34902)      // [255, 130,  89] 
+            let d1 = V3d(0.21177, 0.29412, 0.69804) // [ 54,  75, 178] 
+
+            let upp2 = 1.0
+            let b2 = V3d(1.0, 0.35686, 0.14902)     // [255,  91,  38] 
+            let d2 = V3d(0.07059, 0.18039, 0.69804) // [ 18,  46, 178]
+
+            let (cTrue, cFalse, low, upp) =
+                if sign > 0 then
+                    if error <= upp1 then // Too bright
+                        (V3d(1.0), b1, 0.0, upp1) 
+                    else 
+                        (b1, b2, upp1, upp2) 
+                else 
+                    if error <= upp1 then // Too dark
+                        (V3d(1.0), d1, 0.0, upp1) 
+                    else 
+                        (d1, d2, upp1, upp2) 
+
+            let error = (clamp low upp error) - low 
+
+            return V4d((lerp cTrue cFalse (error / (upp - low))), 1.0)
+        }
 
     let createRenderControl (m : AdaptiveModel) (cubatureSg : ISg<'a>) (referenceSg : ISg<'a>)= 
 
@@ -202,75 +327,32 @@ module RenderUtils =
                 let cubatureSceneTex = createCubatureRenderTexture m clientValues cubatureSg
                 let referenceSceneTex = createReferenceRenderTexture m clientValues referenceSg
                            
-                let tonemapInputTex = m.renderMode |> AVal.bind(fun rm -> 
-                                                                    match rm with
-                                                                    | RenderMode.Cubature -> cubatureSceneTex :> aval<ITexture>
-                                                                    | RenderMode.Reference -> referenceSceneTex :> aval<ITexture>
-                                                                    | _ -> failwith "not implemented")
+                let cubatureSg = createTonemapSg m clientValues cubatureSceneTex
+                let referenceSg = createTonemapSg m clientValues referenceSceneTex
 
-                let lumSig = clientValues.runtime.CreateFramebufferSignature(1, [
-                        DefaultSemantic.Colors, RenderbufferFormat.R32f; 
-                        ]
-                    )    
-                                    
-                let lumInitTask = screenQuad 
-                                |> Sg.shader { do! ToneMapping.lumInit }
-                                |> Sg.uniform "SceneTexture" tonemapInputTex
-                                |> Aardvark.SceneGraph.RuntimeSgExtensions.Sg.compile clientValues.runtime lumSig
+                Sg.dynamic (m.renderMode |> AVal.map (fun rm -> 
+                                                        match rm with
+                                                        | RenderMode.Cubature -> cubatureSg
+                                                        | RenderMode.Reference -> referenceSg
+                                                        | RenderMode.Difference -> 
+                                                        
+                                                            let cubatureTonemaped = 
+                                                                cubatureSg 
+                                                                    |> Sg.compile clientValues.runtime clientValues.signature
+                                                                    |> RenderTask.renderToColor clientValues.size
 
-                let lumTex =
-                    OutputMod.custom 
-                        []
-                        (fun t -> 
-                            let sz = clientValues.size.GetValue t
-                            let mipCnt = Fun.Log2Int(float sz.NormMax) // TODO: use int overload of next Aardvark.Base version
-                            clientValues.runtime.CreateTexture(sz, TextureFormat.R32f, mipCnt, 1))
-                        (fun t h -> false)
-                        (fun h -> clientValues.runtime.DeleteTexture h)
-                        id
+                                                            let referenceTonemaped = 
+                                                                referenceSg
+                                                                    |> Sg.compile clientValues.runtime clientValues.signature
+                                                                    |> RenderTask.renderToColor clientValues.size
 
-                let lumFbo = 
-                    OutputMod.custom 
-                        []
-                        (fun t -> 
-                            let tex = lumTex.GetValue t
-                            clientValues.runtime.CreateFramebuffer(lumSig,
-                                Map.ofList [
-                                    DefaultSemantic.Colors, tex.GetOutputView(0, 0)
-                                ]))
-                        (fun t h -> false)
-                        (fun h -> clientValues.runtime.DeleteFramebuffer h)
-                        id
-
-                // NOTE: FSharp.Data.Adaptive equality does no longer propagate outdated marking if value is ReferenceEqual 
-                //       -> either overwrite ShallowEqualityComparer or use RenderTask.custom that also performs GenerateMipMaps
-                //let temp = RenderTask.renderTo lumFbo lumInitTask
-                //let lumTex = temp |> AVal.map (fun x -> 
-                //                                let fboOut = x.Attachments.[DefaultSemantic.Colors] :?> BackendTextureOutputView
-                //                                let tex = fboOut.texture
-                //                                clientValues.runtime.GenerateMipMaps(tex)
-                //                                tex 
-
-                let lumTex = RenderTask.custom(fun (self, rt, out) ->
-                                                    lumInitTask.Run(rt, out)
-                                                    let outColorTex = out.framebuffer.Attachments.[DefaultSemantic.Colors] :?> BackendTextureOutputView
-                                                    clientValues.runtime.GenerateMipMaps(outColorTex.texture)
-                                                )
-                                        |> RenderTask.renderTo lumFbo
-                                        |> RenderTask.getResult DefaultSemantic.Colors
-
-                let sgFinal = 
-                    screenQuad
-                        |> Sg.shader {
-                                do! ToneMapping.tonemap
-                            }
-                        |> Sg.uniform "SceneTexture" tonemapInputTex
-                        |> Sg.uniform "LumTexture" lumTex
-                        |> Sg.uniform "ExposureMode" m.exposureMode
-                        |> Sg.uniform "MiddleGray" m.key
-                        |> Sg.uniform "Exposure" m.exposure
-                        |> Sg.depthTest (AVal.constant DepthTestMode.None)
-
-                sgFinal
+                                                            screenQuad
+                                                                |> Sg.uniform "ImageTest" (cubatureTonemaped :> aval<ITexture>)
+                                                                |> Sg.uniform "ImageRef" (referenceTonemaped :> aval<ITexture>)
+                                                                |> Sg.shader {
+                                                                        do! differenceEffect
+                                                                    }
+                                                        | _ -> failwith "invalid render mode"
+                                                        ))
             )
                          

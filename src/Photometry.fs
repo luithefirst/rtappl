@@ -1,6 +1,5 @@
 ﻿namespace Demo
 
-open FShade.Imperative
 open FShade
 open Aardvark.Base
 

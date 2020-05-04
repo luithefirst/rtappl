@@ -14,9 +14,10 @@ module Cubature =
     } 
 
     type UniformScope with
-        member x.PolygonNormal      : V3d  = x?PolygonNormal
+        member x.PolygonNormal      : V3d   = x?PolygonNormal
+        member x.PolygonArea        : float = x?PolygonArea
+        member x.VertexCount        : int   = x?VertexCount
         member x.Vertices           : Arr<N<MAX_VERTEXCOUNT>, V3d> = x?Vertices
-        member x.VertexCount        : int  = x?VertexCount
     
     type ClosestPointCase = 
         | Inside = 0
@@ -91,7 +92,9 @@ module Cubature =
 
         2.0 * if halfSA >= 0.0 then halfSA else halfSA + Constant.Pi
 
-
+    (*
+        main shading procedure of our cubature technique
+    *)
     let cubature (ltcSpecular : bool) (usePhotometry : bool) (v : Vertex) = 
         fragment {
     
@@ -105,19 +108,23 @@ module Cubature =
             let T1 = (o - (n * dotNV))  |> Vec.normalize
             let T2 = (Vec.cross n T1) |> Vec.normalize
             let w2t = M33d.FromRows(T1, T2, n)
-                
-            let l = (uniform.Vertices.[0] - P) |> Vec.normalize
-            let dotOut = Vec.dot uniform.PolygonNormal l
+                      
+            // shift shading point away from polygon plane if within epsilon to avoid numerical issues
+            // NOTE: the discontinuity introduced due to the shift can usually not be noticed
+            //       if this code block is commented black pixels appear at the horizon of the polygon plane (visible in startup conditions)
+            //       use the PERLUCE data set with strong emission within polygon plane for best visualization 
+            let l = uniform.Vertices.[0] - P
+            let height = Vec.dot uniform.PolygonNormal l
             let planeEps = 1e-3
-            if abs dotOut < planeEps then
-                let shiftDist = (planeEps - (abs dotOut)) * l.Length
-                let shiftDir = (if dotOut > 0.0 then 1.0 else -1.0) * uniform.PolygonNormal
+            if abs height < planeEps then
+                let shiftDist = (planeEps - (abs height))
+                let shiftDir = (if height < 0.0 then 1.0 else -1.0) * uniform.PolygonNormal
                 let shift = shiftDist * shiftDir
                 P <- P + shift
-                            
+
             // clip polygon by tangent plane
             let (clippedVa, clippedVc) = clipPolygonTS4 uniform.Vertices uniform.VertexCount P w2t
-            
+
             let mutable color = V3d.Zero
             if clippedVc > 2 then
 
@@ -173,7 +180,7 @@ module Cubature =
     
                     // diffuse shading
                     let brdf = v.c.XYZ * Constant.PiInv
-                    color <- color + (Ld / 3.0) * brdf
+                    color <- color + Ld / uniform.PolygonArea * brdf
     
                     // specular
                     if ltcSpecular && denom > 0.0 then
