@@ -1,5 +1,4 @@
-bin/Release
-bin/Debug
+/bin
 .vs
 *.swp
 *.userprefs

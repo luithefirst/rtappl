@@ -12,6 +12,9 @@ module EffectUtils =
     [<Literal>]
     let MAX_VERTEXCOUNT_PLUS_ONE = 5
 
+    [<Literal>]
+    let MAX_SAMPLECOUNT = 64
+
 
     [<GLSLIntrinsic("{0} = {1}")>] [<KeepCall>]
     let set (a: 'a) (b : 'a) = onlyInShaderCode "set" 
@@ -97,3 +100,41 @@ module EffectUtils =
             vc <- vc + 1
 
         (va,vc)
+
+    (*
+        Creates a hash usable as jitter computed from a 2D coordinate
+        Taken from https://briansharpe.wordpress.com/2011/11/15/a-fast-and-simple-32bit-floating-point-hash-function/
+    *)
+    [<ReflectedDefinition>]
+    let fast32Hash (coordinate : V3d) : V4d = 
+        let offset = V2d(26.0, 161.0)
+        let domain = 71.0
+        let someLargeFloat = 951.135664 //+ coordinate.Z
+
+        let mutable P = V4d(coordinate.X, coordinate.Y, coordinate.X, coordinate.Y)
+        P <- P + V4d(0.0, 0.0, 1.0, 1.0)
+        
+        P <- P - floor (P / domain) * domain
+        
+        P <- P + V4d(offset.X, offset.Y, offset.X, offset.Y)
+        P <- P * P
+
+        let xzxz = V4d(P.X, P.Z, P.X, P.Z)
+        let yyww = V4d(P.Y, P.Y, P.W, P.W)
+
+        Fun.Frac(xzxz * yyww * V4d(1.0 / someLargeFloat))
+
+    (*
+        Building an Orthonormal Basis, Revisited
+        branchless version
+    *)
+    [<ReflectedDefinition>] [<Inline>]
+    let basisFrisvad_rev (n : V3d) = 
+        //let sg = float (sign n.Z) // produces garbage because sign of 0 is 0 (original: copysignf(1.0f, n.z))
+        let sg = if n.Z >= 0.0 then 1.0 else -1.0 
+        let a = -1.0 / (sg + n.Z)
+        let b = n.X * n.Y * a
+        let c1 = V3d(1.0 + sg * n.X * n.X * a, sg * b, -sg * n.X)
+        let c2 = V3d(b, sg + n.Y * n.Y * a, -n.Y)
+
+        M33d.FromCols(c1, c2, n)

@@ -12,6 +12,7 @@
     <OutputPath>..\bin\Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="SphericalQuad.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="AppState.fs" />
     <Compile Include="EffectUtils.fs" />
@@ -19,6 +20,7 @@
     <Compile Include="ToneMapping.fs" />
     <Compile Include="LTC.fs" />
     <Compile Include="Cubature.fs" />
+    <Compile Include="Reference.fs" />
     <Compile Include="RenderUtils.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />

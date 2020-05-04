@@ -58,9 +58,6 @@ module ToneMapping =
             return V4d(logLumClamped, 0.0, 0.0, 0.0) 
         }
 
-    [<GLSLIntrinsic("mix({0},{1},{2})")>]
-    let LerpV<'a when 'a :> IVector> (a : 'a) (b : 'a) (s : 'a) : 'a = onlyInShaderCode ""
-
     [<GLSLIntrinsic("lessThanEqual({0},{1})")>]
     let LessThanEqual<'a when 'a :> IVector> (a : 'a) (b : 'a) : 'a = onlyInShaderCode ""
 
@@ -69,7 +66,7 @@ module ToneMapping =
         let rTrue = c * 12.92
         let rFalse = 1.055 * (pow c (V3d (1.0 / 2.4))) - 0.055
 
-        LerpV rFalse rTrue (LessThanEqual c (V3d 0.0031308))
+        lerp rFalse rTrue (LessThanEqual c (V3d 0.0031308))
 
     let tonemap (v : VertexFSQ) =
         fragment {

@@ -24,7 +24,7 @@ module App =
     let update (m : Model) (msg : Message) =
         match msg with
             
-            | SetRenderMode rm -> { m with renderMode = rm.Value }
+            | SetRenderMode rm -> { m with renderMode = rm }
             | ToggleLTCSpecular -> { m with ltcSpecular = not m.ltcSpecular }
 
             | ResetLightTransform -> { m with transform = initLightTransform }
@@ -50,7 +50,7 @@ module App =
 
             | SetExposure v -> { m with exposure = v }
             | SetKey v -> { m with key = v }
-            | SetExposureMode o -> match o with | Some v -> { m with exposureMode = v } | None -> m
+            | SetExposureMode em -> { m with exposureMode = em }
 
 
             | NOP -> m
@@ -71,9 +71,9 @@ module App =
             photometryData  = None
 
             // ground truth 
-            gtSamplingMode     = GTSamplingMode.SolidAngle
-            gtSamplesPerFrame  = 16
-            gtNoAccumulation   = false
+            refSamplingMode     = ReferenceSamplingMode.SolidAngle
+            refSamplesPerFrame  = 16
+            refNoAccumulation   = false
 
             // tone-mapping
             exposureMode = ExposureMode.Manual
@@ -82,7 +82,7 @@ module App =
 
             cameraState = FreeFlyController.initial 
 
-        } (Message.LoadPhotometry ["..\\..\\..\\photometry\\MIREL_42925637.LDT"])
+        } (Message.LoadPhotometry ["..\\photometry\\MIREL_42925637.LDT"])
 
     let enumValuesToDomNodes<'msg, 'v, 'a when 'a : enum<'v>> (f : 'a -> DomNode<'msg>) =
         let values = Enum.GetValues typeof<'a> :?> ('a [])
@@ -173,9 +173,6 @@ module App =
         let renderModeValues = enumValuesToDomNodes (fun (rm : RenderMode) -> text (Enum.GetName(typeof<RenderMode>, rm)))
         let exposureModeValues = enumValuesToDomNodes (fun (em : ExposureMode) -> text (Enum.GetName(typeof<ExposureMode>, em)))
 
-        let renderModeOptionMod : aval<Option<RenderMode>> = m.renderMode |> AVal.map (fun x -> Some x)
-        let exposureModeOptionMod : aval<Option<ExposureMode>> = m.exposureMode |> AVal.map (fun x -> Some x)
-
         require Html.semui (
             body [] [
 
@@ -188,8 +185,7 @@ module App =
                    
                     h4 [style "color:white"] [text "Rendering"]                          
                     Html.table [
-                        // TODO use dropdown1 of v5
-                        Html.row "Render Mode" [ dropdown { allowEmpty = false; placeholder = "" } [ clazz "ui inverted selection dropdown" ] renderModeValues renderModeOptionMod SetRenderMode ]
+                        Html.row "Render Mode" [ dropdown1 [ clazz "ui inverted selection dropdown" ] renderModeValues m.renderMode SetRenderMode ]
                         
                         Html.row "LTC Specular" [ simplecheckbox { 
                                 attributes [clazz "ui inverted toggle checkbox"; style "" ]
@@ -280,7 +276,7 @@ module App =
                     // tone mapping
                     h4 [style "color:white"] [text "Tonemapping"]
                     Html.table [
-                        Html.row "Mode" [ dropdown { allowEmpty = false; placeholder = "" } [ clazz "ui inverted selection dropdown" ] exposureModeValues exposureModeOptionMod SetExposureMode ]
+                        Html.row "Mode" [ dropdown1 [ clazz "ui inverted selection dropdown" ] exposureModeValues m.exposureMode SetExposureMode ]
                         Html.row "Exposure" [ simplenumeric { attributes [clazz "ui inverted input"]; value m.exposure; update SetExposure; step 0.1; largeStep 1.0; min -20.0; max 10.0; }]
                         Html.row "Middle Gray" [ simplenumeric { attributes [clazz "ui inverted input"]; value m.key; update SetKey; step 0.001; largeStep 0.01; min 0.001; max 1.0; }]
                         ]

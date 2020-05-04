@@ -98,11 +98,17 @@ module RenderUtils =
                         ]
                     )    
 
-                let sceneTex = scene 
+                // NOTE: RenderTask.renderTo clears to [0,0,0,1], but we need to clear with [0,0,0,0] so background is not tone mapped
+                let clearTask = clientValues.runtime.CompileClear(hdrColorSig, AVal.constant C4f.Zero, AVal.constant 1.0)
+                let sceneTask = scene 
                                     |> Sg.viewTrafo clientValues.viewTrafo
                                     |> Sg.projTrafo clientValues.projTrafo
                                     |> Aardvark.SceneGraph.RuntimeSgExtensions.Sg.compile clientValues.runtime hdrColorSig
-                                    |> RenderTask.renderToColor clientValues.size
+                                    //|> RenderTask.renderToColor clientValues.size
+
+                let fbo = clientValues.runtime.CreateFramebuffer(hdrColorSig, clientValues.size)
+                let sceneTaskWithClear = new RenderTask.SequentialRenderTask([|clearTask; sceneTask|]) |> RenderTask.renderTo fbo
+                let sceneTex = RenderTask.getResult DefaultSemantic.Colors sceneTaskWithClear
                                     
                 let lumInitTask = screenQuad 
                                 |> Sg.shader { do! ToneMapping.lumInit }
@@ -114,7 +120,7 @@ module RenderUtils =
                         []
                         (fun t -> 
                             let sz = clientValues.size.GetValue t
-                            let mipCnt = Fun.Log2Int(float sz.NormMax) // wtf? there should be an int overload!
+                            let mipCnt = Fun.Log2Int(float sz.NormMax) // TODO: use int overload of next Aardvark.Base version
                             clientValues.runtime.CreateTexture(sz, TextureFormat.R32f, mipCnt, 1))
                         (fun t h -> false)
                         (fun h -> clientValues.runtime.DeleteTexture h)
@@ -127,19 +133,28 @@ module RenderUtils =
                             let tex = lumTex.GetValue t
                             clientValues.runtime.CreateFramebuffer(lumSig,
                                 Map.ofList [
-                                    DefaultSemantic.Colors, ({ texture = tex; slice = 0; level = 0 } :> IFramebufferOutput)
+                                    DefaultSemantic.Colors, tex.GetOutputView(0, 0)
                                 ]))
                         (fun t h -> false)
                         (fun h -> clientValues.runtime.DeleteFramebuffer h)
                         id
-                        
-                let temp = RenderTask.renderTo lumFbo lumInitTask
-                let lumTex = temp |> AVal.map (fun x -> 
-                                                let fboOut = x.Attachments.[DefaultSemantic.Colors] :?> BackendTextureOutputView
-                                                let tex = fboOut.texture
-                                                clientValues.runtime.GenerateMipMaps(tex)
-                                                tex
+
+                // NOTE: FSharp.Data.Adaptive equality does no longer propagate outdated marking if value is ReferenceEqual 
+                //       -> either overwrite ShallowEqualityComparer or use RenderTask.custom that also performs GenerateMipMaps
+                //let temp = RenderTask.renderTo lumFbo lumInitTask
+                //let lumTex = temp |> AVal.map (fun x -> 
+                //                                let fboOut = x.Attachments.[DefaultSemantic.Colors] :?> BackendTextureOutputView
+                //                                let tex = fboOut.texture
+                //                                clientValues.runtime.GenerateMipMaps(tex)
+                //                                tex 
+
+                let lumTex = RenderTask.custom(fun (self, rt, out) ->
+                                                    lumInitTask.Run(rt, out)
+                                                    let outColorTex = out.framebuffer.Attachments.[DefaultSemantic.Colors] :?> BackendTextureOutputView
+                                                    clientValues.runtime.GenerateMipMaps(outColorTex.texture)
                                                 )
+                                        |> RenderTask.renderTo lumFbo
+                                        |> RenderTask.getResult DefaultSemantic.Colors
 
                 let sgFinal = 
                     screenQuad
