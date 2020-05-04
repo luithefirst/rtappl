@@ -26,6 +26,9 @@ module App =
             
             | SetRenderMode rm -> { m with renderMode = rm }
             | ToggleLTCSpecular -> { m with ltcSpecular = not m.ltcSpecular }
+            | SetSampleCount sc -> { m with refSamplesPerFrame = int sc }
+            | SetSamplingMode sm -> { m with refSamplingMode = sm }
+            | ToggleAccumulation -> { m with refAccumulation = not m.refAccumulation }
 
             | ResetLightTransform -> { m with transform = initLightTransform }
             | ChangeLightTransformMode tm -> { m with transformMode = tm }
@@ -73,7 +76,7 @@ module App =
             // ground truth 
             refSamplingMode     = ReferenceSamplingMode.SolidAngle
             refSamplesPerFrame  = 16
-            refNoAccumulation   = false
+            refAccumulation     = true
 
             // tone-mapping
             exposureMode = ExposureMode.Manual
@@ -99,6 +102,7 @@ module App =
 
         let polygonVertices = m.polygon |> AVal.map2 (fun (t : Trafo3d) p -> p.GetPointArray (fun (v : V2d) -> V3f(t.Forward.TransformPos(v.XYO)))) m.transform
         let polygonVertexCount = m.polygon |> AVal.map (fun p -> p.PointCount)
+        let polygonArea = m.polygon |> AVal.map (fun p -> p.ComputeArea())
 
         let addressing = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> x.AddressingParameters) |> Option.defaultValue V4f.Zero)
         let offsetScale = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> x.ImageOffsetScale) |> Option.defaultValue V4f.Zero)
@@ -114,6 +118,7 @@ module App =
             |> Sg.uniform "ProfileAddressing" addressing
             |> Sg.uniform "TextureOffsetScale" offsetScale
             |> Sg.uniform "PolygonNormal" lightNormal
+            |> Sg.uniform "PolygonArea" polygonArea
             |> Sg.uniform "Vertices" polygonVertices
             |> Sg.uniform "VertexCount" polygonVertexCount
             |> Sg.texture (Symbol.Create "IntensityTexture") texture
@@ -128,6 +133,17 @@ module App =
                                 (Cubature.cubature spec usePh) |> toEffect
                             ]
                     ) m.ltcSpecular m.usePhotometry)
+
+    let withReferenceEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
+        
+        Sg.dynamic (AVal.map2 (fun sampleMethod usePhotometry ->
+                        sceneGraph 
+                            |> Sg.effect [
+                                DefaultSurfaces.trafo |> toEffect
+                                (Reference.referenceLighting sampleMethod usePhotometry) |> toEffect
+                            ]
+                    ) m.refSamplingMode m.usePhotometry)
+
 
     let view (m : AdaptiveModel) =
        
@@ -161,17 +177,25 @@ module App =
         let planeGeometry = IndexedGeometryPrimitives.Box.solidBox (Box3d.FromCenterAndSize(V3d.OOO, V3d(50.0, 50.0, 0.1))) C4b.White
         let groundPlaneSg = Sg.ofIndexedGeometry planeGeometry
 
-        let shadedSg = Sg.ofList [ groundPlaneSg ]
-                        |> withCubatureEffect m
+        let cubatureSg = Sg.ofList [ groundPlaneSg ]
+                            |> withCubatureEffect m
 
-        let scene = Sg.ofList [lightSg; shadedSg]
+        let referenceSg = Sg.ofList [ groundPlaneSg ]
+                            |> withReferenceEffect m
+
+        let cubatureSg = Sg.ofList [lightSg; cubatureSg]
+                        |> lightUniforms m
+                        |> LTC.setLTCSpecularUniforms
+
+        let referenceSg = Sg.ofList [lightSg; referenceSg]
                         |> lightUniforms m
                         |> LTC.setLTCSpecularUniforms
        
-        let renderControl = RenderUtils.createTonemapRenderControl m scene
+        let renderControl = RenderUtils.createRenderControl m cubatureSg referenceSg
         
         let renderModeValues = enumValuesToDomNodes (fun (rm : RenderMode) -> text (Enum.GetName(typeof<RenderMode>, rm)))
         let exposureModeValues = enumValuesToDomNodes (fun (em : ExposureMode) -> text (Enum.GetName(typeof<ExposureMode>, em)))
+        let samplingModeValues = enumValuesToDomNodes (fun (sm : ReferenceSamplingMode) -> text (Enum.GetName(typeof<ReferenceSamplingMode>, sm)))
 
         require Html.semui (
             body [] [
@@ -192,6 +216,17 @@ module App =
                                 state m.ltcSpecular
                                 toggle ToggleLTCSpecular
                             } ]
+
+                        Html.row "Sampling Mode" [ dropdown1 [ clazz "ui inverted selection dropdown" ] samplingModeValues m.refSamplingMode SetSamplingMode ]
+
+                        Html.row "Sample Count" [ simplenumeric { attributes [clazz "ui inverted input"]; value (m.refSamplesPerFrame |> AVal.map(fun sc -> float sc)); update SetSampleCount; step 1.0; largeStep 1.0; min 1.0; max 64.0; }]
+
+                        Html.row "Accumulation" [ simplecheckbox { 
+                                attributes [clazz "ui inverted toggle checkbox"; style "" ]
+                                state m.refAccumulation
+                                toggle ToggleAccumulation
+                            } ]
+
                         ]
 
                     h4 [style "color:white"] [text "Light"]                          

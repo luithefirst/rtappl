@@ -12,7 +12,6 @@ module Cubature =
         [<Normal>]          n       : V3d
         [<Color>]           c       : V4d
     } 
-    
 
     type UniformScope with
         member x.PolygonNormal      : V3d  = x?PolygonNormal

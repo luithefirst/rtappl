@@ -25,25 +25,26 @@ module Reference =
         member x.PolygonNormal      : V3d  = x?PolygonNormal
         member x.Vertices           : Arr<N<MAX_VERTEXCOUNT>, V3d> = x?Vertices
         member x.VertexCount        : int  = x?VertexCount
-        // sampling
+        // reference rendering specific uniforms
         member x.HaltonSamples      : Arr<N<MAX_SAMPLECOUNT>, V2d> = x?HaltonSamples
         member x.SampleCount        : int  = x?SampleCount
         member x.AccumulatedSampleCount : int  = x?AccumulatedSampleCount
 
     (*
-        Samples a direction from the hemisphere for two given random numbers where the samples are cosine weighted
-        Works in the tangent space
-        http://www.rorydriscoll.com/2009/01/07/better-sampling/
+        Generates a cosine weighted random direction using the 2 random varables x1 and x2.
+        See Global Illuminatin Compendium, Dutré 2003, (35)
+        PDF = cos(theta)/PI
     *)
     [<ReflectedDefinition>] [<Inline>]
     let cosineSampleHemisphere u1 u2 = 
+        // random sample on disk (x,y) and project to hemisphere (z)
         let r = sqrt u1
-        let theta = Constant.PiTimesTwo * u2
+        let phi = Constant.PiTimesTwo * u2
 
         V3d(
-            r * (cos theta), 
-            r * (sin theta), 
-            sqrt (1.0 - u1)
+            r * (cos phi), 
+            r * (sin phi), 
+            sqrt (1.0 - u1) // u1 = r^2
         )
 
     (*
@@ -118,7 +119,6 @@ module Reference =
                 if samplingMethod = ReferenceSamplingMode.BRDF then
                                 
                     //let i = sampleHemisphere u1 u2                
-                    //let brdfPDF = 1.0 / PI // uniform spherical sampling
 
                     let i = cosineSampleHemisphere u1 u2
 
@@ -130,8 +130,8 @@ module Reference =
 
                     if hitLight then
                         //let dotIn = i.Z
-                        //let brdfPDF = dotIn / Constant.PiTimesTwo // cosine spherical sampling
-                        let invPdf = Constant.PiTimesTwo // NOTE: dotIn cancelled
+                        //let samplePDF = dotIn / Pi // cosine hemisphere sampling pdf
+                        let invPdf = Constant.Pi // NOTE: dotIn cancelled, Pi will actually also cancel by *brdf
 
                         let worldI = t2w * -i
                         let dotOut = max 1e-9 (abs (Vec.dot worldI uniform.PolygonNormal))

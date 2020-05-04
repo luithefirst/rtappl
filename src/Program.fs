@@ -22,8 +22,8 @@ module Main =
     
         Aardium.run {
             title "Aardvark rocks \\o/"
-            width 1024
-            height 768
+            width 1280
+            height 960
             url "http://localhost:4321/"
         }
 

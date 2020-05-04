@@ -43,7 +43,7 @@ type Model =
         // ground truth 
         refSamplingMode       : ReferenceSamplingMode
         refSamplesPerFrame    : int
-        refNoAccumulation     : bool
+        refAccumulation       : bool
         
         // tonemapping
         exposureMode    : ExposureMode
@@ -60,6 +60,9 @@ type Message =
     // rendering settings
     | SetRenderMode of RenderMode
     | ToggleLTCSpecular
+    | ToggleAccumulation
+    | SetSamplingMode of ReferenceSamplingMode
+    | SetSampleCount of float
 
     // light settings
     | LoadPhotometry of list<string>
