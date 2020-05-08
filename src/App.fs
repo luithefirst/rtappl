@@ -93,7 +93,7 @@ module App =
 
             cameraState = FreeFlyController.initial 
 
-        } (Message.LoadPhotometry ["..\\photometry\\MIREL_42925637.LDT"])
+        } (Message.LoadPhotometry ["..\\..\\..\\photometry\\MIREL_42925637.LDT"])
 
     let enumValuesToDomNodes<'msg, 'v, 'a when 'a : enum<'v>> (f : 'a -> DomNode<'msg>) =
         let values = Enum.GetValues typeof<'a> :?> ('a [])

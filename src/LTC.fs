@@ -83,12 +83,17 @@ module LTC =
                         yield binReader.ReadSingle()
                 |]
 
-            let tex = importTexFromBinary ("..\\textures\\ltc_mat.bin") matTexBinReaderProcedure
+            let tex =
+                try
+                    importTexFromBinary ("..\\..\\..\\textures\\ltc_mat.bin") matTexBinReaderProcedure :> ITexture
+                with e -> 
+                    NullTexture() :> ITexture
 
-            AVal.constant (tex :> ITexture)
+            AVal.constant tex
+
 
         let importAmpTex = 
-
+            
             let ampTexBinReaderProcedure (binReader : BinaryReader) = 
                 [|
                     let mutable count = 0
@@ -103,9 +108,14 @@ module LTC =
                             count <- 0
                 |]
 
-            let tex = importTexFromBinary ("..\\textures\\ltc_amp.bin") ampTexBinReaderProcedure
+            let tex = 
+                try
+                    importTexFromBinary ("..\\..\\..\\textures\\ltc_amp.bin") ampTexBinReaderProcedure :> ITexture
+                with e -> 
+                    Log.warn "%A" e
+                    NullTexture() :> ITexture
 
-            AVal.constant (tex :> ITexture)
+            AVal.constant tex
 
 
     let ltcAmpTex = LUTImporter.importAmpTex
