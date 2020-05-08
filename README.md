@@ -1,5 +1,4 @@
-# rtappl
-Real-time Approximation of Photometric Polygonal Lights Demo
+# Real-time Approximation of Photometric Polygonal Lights Demo
 
 ![Screenshot](screenshot.jpg)
 
