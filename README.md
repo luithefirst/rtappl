@@ -1,4 +1,4 @@
-# Real-time Approximation of Photometric Polygonal Lights Demo
+# Real-time Approximation of Photometric Polygonal Lights
 
 ![Screenshot](screenshot.jpg)
 
@@ -14,4 +14,4 @@ The demo requires the .NET Core 3.0 SDK. Nuget packages are managed using `paket
 
 You can also use the supplied build script by executing `build` in the command prompt. The script uses [aardvark.fake](https://github.com/aardvark-platform/aardvark.fake) with extended functionality.
 
-The `Demo.exe` excecutable is built to `bin\Release\netcoreapp3.1\` and can be started from this directory.
+The `Demo.exe` is built to `bin\Release\netcoreapp3.1\` and can be run from this directory.
