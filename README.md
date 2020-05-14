@@ -1,7 +1,6 @@
 # Real-time Approximation of Photometric Polygonal Lights
 
-This repository contains a demo application of the publication with the same title that is part of the I3D 2020 paper program and published in the PACMCGIT journal:
-https://rtappl.vrvis.at/
+This repository contains a demo application as supplemental material to the publication ["Real-time Approximation of Photometric Polygonal Lights"](https://rtappl.vrvis.at/) that is part of the I3D 2020 paper program and published in the PACMCGIT journal:
 
 The demo is implemented in F# and uses the [Aardvark plattform](https://github.com/aardvark-platform).
 
@@ -9,7 +8,7 @@ The demo is implemented in F# and uses the [Aardvark plattform](https://github.c
 
 ## How to build
 
-The demo requires the .NET Core 3.0 SDK. Nuget packages are managed using `paket` (https://fsprojects.github.io/Paket/). Paket needs to be installed as local dotnet tool using the .NET Core CLI and the nuget packages need to be restored before the build.
+The demo requires the .NET Core 3.0 SDK. It manages Nuget packages using `paket` (https://fsprojects.github.io/Paket/) that needs to be installed as local dotnet tool using the .NET Core CLI. The packages need to be restored before the build.
 
 `dotnet tool install Paket --tool-path .paket`
 
