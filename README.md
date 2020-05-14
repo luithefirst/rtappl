@@ -1,5 +1,10 @@
 # Real-time Approximation of Photometric Polygonal Lights
 
+This repository contains a demo application of the publication with the same title that is part of the I3D 2020 paper program and published in the PACMCGIT journal:
+https://rtappl.vrvis.at/
+
+The demo is implemented in F# and uses the [Aardvark plattform](https://github.com/aardvark-platform).
+
 ![Screenshot](screenshot.jpg)
 
 ## How to build
