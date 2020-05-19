@@ -1,6 +1,6 @@
 # Real-time Approximation of Photometric Polygonal Lights
 
-This repository contains a demo application as supplemental material to the publication ["Real-time Approximation of Photometric Polygonal Lights"](https://rtappl.vrvis.at/) that is part of the I3D 2020 paper program and published in the PACMCGIT journal
+This repository contains a demo application as supplemental material to the publication ["Real-time Approximation of Photometric Polygonal Lights"](https://rtappl.vrvis.at/) that is part of the I3D 2020 paper program and published in the PACMCGIT journal.
 
 The demo is implemented in F# and is baed on the [Aardvark plattform](https://github.com/aardvark-platform). It uses [FShade](https://www.fshade.org/), a DSL for shader programming. The main shading procedure of the cubature technique presentend in the paper can be found in [Cubature.fs](https://github.com/luithefirst/rtappl/blob/master/src/Cubature.fs#L95).
 
