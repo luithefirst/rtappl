@@ -115,6 +115,18 @@ module App =
         let addressing = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> x.AddressingParameters) |> Option.defaultValue V4f.Zero)
         let offsetScale = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> x.ImageOffsetScale) |> Option.defaultValue V4f.Zero)
         let texture = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> PixTexture2d(PixImageMipMap(x.Image), false) :> ITexture) |> Option.defaultValue (NullTexture() :> ITexture))
+
+        let textureCube = sampler |> AVal.map (fun x -> x |> Option.map (fun sam -> 
+                                                                    let cube = sam.GetCubeTexture()
+                                                                    let cubeFaces = cube.MipMapArray
+                                                                    // Z-up (DirectX) to Y-up (OpenGL)
+                                                                    // XN YP XP YN ZP ZN -> XP XN ZN ZP YP YN 
+                                                                    //  -> in shader use (X, -Z, Y) to perform lookup
+                                                                    let cubeFaces = [| cubeFaces.[2]; cubeFaces.[0]; cubeFaces.[5]; cubeFaces.[4]; cubeFaces.[1]; cubeFaces.[3] |]
+                                                                    let imgCube = PixImageCube(cubeFaces |> Array.map (fun x -> PixImageMipMap(x.MipArray.[0].ToPixImage())))
+                                                                    PixTextureCube(imgCube, true) :> ITexture // wantMipMaps = true -> Future work: use mip bias to smoothen illuminaiton in near-field
+                                                                ) 
+                                                         |> Option.defaultValue (NullTexture() :> ITexture))
                 
         let usePhotometry = AVal.map2 (fun ena data -> ena && Option.isSome data) m.usePhotometry m.photometryData
         let diffuseExitance = AVal.bind2 (fun ena data -> if ena && Option.isNone data then AVal.constant 0.0 else m.diffuseExitance) m.usePhotometry m.photometryData
@@ -129,7 +141,8 @@ module App =
             |> Sg.uniform "PolygonArea" polygonArea
             |> Sg.uniform "Vertices" polygonVertices
             |> Sg.uniform "VertexCount" polygonVertexCount
-            |> Sg.texture (Symbol.Create "IntensityTexture") texture
+            |> Sg.texture Photometry.IntensityTexture.Symbol texture
+            |> Sg.texture Photometry.IntensityCube.Symbol textureCube
 
     let withCubatureEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
 
@@ -166,7 +179,11 @@ module App =
                                 let P = V3d(v.wp)
                                 
                                 let dir = C - P |> Vec.normalize
+                                #if SPHEREMAP
                                 let i = Photometry.getRadiance_World dir uniform?UsePhotometry
+                                #else
+                                let i = Photometry.getCubeRadiance_World dir uniform?UsePhotometry
+                                #endif
 
                                 // add some intensity to light, so it is not completely dark in direction without emission
                                 return V4d(V3d(i + 5.0), 0.0) 

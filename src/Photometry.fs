@@ -5,10 +5,12 @@ open Aardvark.Base
 
 module Photometry =
 
-    let IntensityTexture   = TypedSymbol<ITexture>("IntensityTexture")
-    let ProfileAddressing  = TypedSymbol<V4d>("ProfileAddressing")
-    let TextureOffsetScale = TypedSymbol<V4d>("TextureOffsetScale")
+    let IntensityTexture   = TypedSymbol<ITexture> "IntensityTexture"
+    let ProfileAddressing  = TypedSymbol<V4d> "ProfileAddressing" 
+    let TextureOffsetScale = TypedSymbol<V4d> "TextureOffsetScale"
 
+    /// spherical texture containing measurement data
+    /// NOTE: data maps depending on symmetry mode to full/half/quater sphere or single row
     let private intensityProfileSampler = 
            sampler2d {
                texture uniform?IntensityTexture
@@ -93,6 +95,46 @@ module Photometry =
         else            
             let v = uniform.LightBasis * i
             let int = getIntensity' v
+            let dotOut = abs v.Z
+            int / (dotOut + 1e-5)
+
+
+    ////////////////////////
+    // Cubemap photometry
+
+    let IntensityCube = TypedSymbol<ITexture> "IntensityCube"
+
+    let private intensityCubeSampler = 
+            samplerCube {
+                texture uniform?IntensityCube
+                filter Filter.MinMagMipLinear
+            }
+
+    /// get photometry intensity from normalized direction vector
+    [<ReflectedDefinition>] [<Inline>]
+    let getCubeIntensity(v : V3d) =
+        let v = V3d(v.X, -v.Z, v.Y)
+        intensityCubeSampler.SampleLevel(v, 0.0).X
+
+    /// get photometry intensity from a normalized world direction with light transform and option to 
+    [<ReflectedDefinition>] [<Inline>]
+    let getCubeIntensity_World (i : V3d) (usePhotometry : bool) =
+           
+        if not usePhotometry then
+            let forward = uniform.LightBasis.R2
+            uniform.DiffuseExitance * (abs (Vec.dot i forward))
+        else            
+            let v = uniform.LightBasis * i
+            getCubeIntensity v
+
+    [<ReflectedDefinition>] [<Inline>]
+    let getCubeRadiance_World (i : V3d) (usePhotometry : bool) =
+           
+        if not usePhotometry then
+            uniform.DiffuseExitance
+        else            
+            let v = uniform.LightBasis * i
+            let int = getCubeIntensity v
             let dotOut = abs v.Z
             int / (dotOut + 1e-5)
             

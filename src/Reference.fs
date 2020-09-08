@@ -134,8 +134,13 @@ module Reference =
 
                         let worldI = t2w * -i
                                 
-                        let I = Photometry.getRadiance_World worldI usePhotometry // includes divisiion by dotOut
-                        let Le = I / uniform.PolygonArea
+                        #if SPHEREMAP
+                        let Le = Photometry.getRadiance_World worldI usePhotometry // includes divisiion by dotOut
+                        #else
+                        let Le = Photometry.getCubeRadiance_World worldI usePhotometry // includes divisiion by dotOut
+                        #endif
+
+                        let Le = Le / uniform.PolygonArea
 
                         L_d <- L_d + Le * invPdf
 
@@ -151,7 +156,11 @@ module Reference =
                     if dotIn > 1e-7 then
 
                         let worldI = t2w * -sampleDir
+                        #if SPHEREMAP
                         let I = Photometry.getIntensity_World worldI usePhotometry
+                        #else
+                        let I = Photometry.getCubeIntensity_World worldI usePhotometry
+                        #endif
 
                         // PDf of area = 1 -> area to solid angle:
                         //let pdf = samplePointDistSqrd / (Area * dotOut)   |* Area |* dotOut
@@ -175,8 +184,13 @@ module Reference =
                     if dotIn > 1e-7 then  
                         let dotOut = max 1e-9 (abs (Vec.dot worldI uniform.PolygonNormal))
 
-                        let I = Photometry.getRadiance_World worldI usePhotometry
-                        let Le = I / uniform.PolygonArea
+                        #if SPHEREMAP
+                        let Le = Photometry.getRadiance_World worldI usePhotometry
+                        #else
+                        let Le = Photometry.getCubeRadiance_World worldI usePhotometry
+                        #endif
+
+                        let Le = Le / uniform.PolygonArea
 
                         L_d <- L_d + (Le * dotIn) * invPdf
 

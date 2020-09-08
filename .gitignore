@@ -10,7 +10,6 @@
 /src/.vs
 /paket-files
 /.fake
-/.paket/paket.exe
 /src/Demo/.domaincache
-/.paket/Paket.Restore.targets
 /src/*.domaincache
+/.paket

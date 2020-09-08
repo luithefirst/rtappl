@@ -143,7 +143,11 @@ module Cubature =
                 for i in 0..clippedVc-1 do
                     let dir = clippedVa.[i].XYZ |> Vec.normalize
                     let iw = -(mulT w2t dir) 
+                    #if SPHEREMAP
                     let Le = Photometry.getRadiance_World iw usePhotometry // note: includes 1/dotOut
+                    #else
+                    let Le = Photometry.getCubeRadiance_World iw usePhotometry // note: includes 1/dotOut
+                    #endif
                     set clippedVa.[i] (V4d(dir, Le))
         
                 // init triangle count: VertexCount in case of closest point is inside polygon
@@ -156,7 +160,11 @@ module Cubature =
                 if pointCase <> ClosestPointCase.Vertex then                    
                     let dir = closestPointDir
                     let iw = -(mulT w2t dir)
+                    #if SPHEREMAP
                     let Le = Photometry.getRadiance_World iw usePhotometry // note: includes 1/dotOut
+                    #else
+                    let Le = Photometry.getCubeRadiance_World iw usePhotometry // note: includes 1/dotOut
+                    #endif
                     v0 <- V4d(closestPointDir, Le)
                 else
                     v0 <- clippedVa.[i0]

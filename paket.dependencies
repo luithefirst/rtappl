@@ -4,29 +4,29 @@ source https://api.nuget.org/v3/index.json
 nuget FSharp.Core                           >= 4.6.2 lowest_matching: true
 
 // Aardvark Base                                            
-nuget Aardvark.Base                         ~> 5.0.5
-nuget Aardvark.Base.Incremental             ~> 5.0.5
-nuget Aardvark.Base.FSharp                  ~> 5.0.5
+nuget Aardvark.Base                         ~> 5.0.18
+nuget Aardvark.Base.Incremental             ~> 5.0.18
+nuget Aardvark.Base.FSharp                  ~> 5.0.18
                 
 // Aardvark Rendering				
-nuget Aardvark.Base.Rendering               ~> 5.0.2
-nuget Aardvark.SceneGraph                   ~> 5.0.2
-nuget Aardvark.SceneGraph.IO                ~> 5.0.2
-nuget Aardvark.Rendering.Text               ~> 5.0.2
+nuget Aardvark.Base.Rendering               ~> 5.0.9
+nuget Aardvark.SceneGraph                   ~> 5.0.9
+nuget Aardvark.SceneGraph.IO                ~> 5.0.9
+nuget Aardvark.Rendering.Text               ~> 5.0.9
                                             
-nuget Aardvark.Application.Slim             ~> 5.0.2
-nuget Aardvark.Application.Slim.GL          ~> 5.0.2
-nuget Aardvark.Application.Slim.Vulkan      ~> 5.0.2
+nuget Aardvark.Application.Slim             ~> 5.0.9
+nuget Aardvark.Application.Slim.GL          ~> 5.0.9
+nuget Aardvark.Application.Slim.Vulkan      ~> 5.0.9
 
 // Aardvark Algodat
-nuget Aardvark.Data.Photometry              ~> 5.0.0
+nuget Aardvark.Data.Photometry              ~> 5.0.22
 
 // Aardvark Media
-nuget Aardvark.Service                      ~> 5.0.1
-nuget Aardvark.UI                           ~> 5.0.1
-nuget Aardvark.UI.Primitives                ~> 5.0.1
+nuget Aardvark.Service                      ~> 5.0.6
+nuget Aardvark.UI                           ~> 5.0.6
+nuget Aardvark.UI.Primitives                ~> 5.0.6
 
-nuget Adaptify.MSBuild                      ~> 0.0.39
+nuget Adaptify.MSBuild                      ~> 1.0.1
 
 nuget Aardium                               ~> 1.0.30
 
