@@ -264,7 +264,12 @@ module Cubature =
             
             let vb = w2t * (uniform.Vertices.[0].XYZ - P)
             
+            let mutable v00 = Unchecked.defaultof<V3d> // va.[0] (not normalized)
+            let mutable vl = Unchecked.defaultof<V3d> // last vertex (not normalized)
+
             if (vb.Z >= -eps) then 
+                v00 <- vb
+                vl <- vb
                 let dir = vb.Normalized
                 set va.[0].XYZ dir
                 set va.[0].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
@@ -281,68 +286,73 @@ module Cubature =
                 if (h0v && h1n || h0n && h1v) then
                     let ve = (mix v0 v1 (v0.Z / (v0.Z - v1.Z)))
 
-                    // clamp closest with edge
-                    if vc > 0 then // v0-ve
-                        let edgePlaneN = (Vec.cross v0 ve)
+                    // clamp closest to new edge
+                    if vc > 0 then // vl-ve
+                        let edgePlaneN = (Vec.cross vl ve)
                         let dotPlane = Vec.dot edgePlaneN closestPoint
     
                         // check if point is outside the polygon
                         if flipSng * dotPlane > -1e-9 then
                             
-                            let ab = ve - v0
-                            let ap = closestPoint - v0
+                            let ab = ve - vl
+                            let ap = closestPoint - vl
                             let lenSq = Vec.dot ab ab
                             let t = if lenSq > 1e-5 then
                                         (Vec.dot ab ap) / lenSq
                                     else 
                                         0.0
     
-                            let projectedPoint = v0 + (clamp 0.0 1.0 t) * ab
+                            let projectedPoint = vl + (clamp 0.0 1.0 t) * ab
           
                             // check for projected point distance -> take closest
                             let dist = Vec.lengthSquared (projectedPoint - closestPoint)
                             if dist < smallestDist then
                                 closestPointClamped <- projectedPoint
                                 case <- if t > 0.001 && t < 0.999 then ClosestPointCase.Edge else ClosestPointCase.Vertex
-                                closestIndex <- if t > 0.999 then vc else vc - 1
+                                closestIndex <- if t > 0.999 then vc else vc-1
                                 smallestDist <- dist
+                    else
+                        v00 <- ve
 
-                    v0 <- ve
                     // set next vertex
-                    let dir = v0.Normalized
+                    vl <- ve
+                    let dir = ve.Normalized
                     set va.[vc].XYZ dir
                     set va.[vc].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
                     vc <- vc + 1
             
                 if (v1.Z >= -eps) then 
 
-                    // clamp closest with edgewith edge
-                    if vc > 0 then // v0-v1 // check necessary ??
-                       let edgePlaneN = (Vec.cross v0 v1)
+                    // clamp closest point to new edge
+                    if vc > 0 then // vl-v1 // check necessary ??
+                       let edgePlaneN = (Vec.cross vl v1)
                        let dotPlane = Vec.dot edgePlaneN closestPoint
     
                        // check if point is outside the polygon
                        if flipSng * dotPlane > -1e-9 then
                            
-                           let ab = v1 - v0
-                           let ap = closestPoint - v0
+                           let ab = v1 - vl
+                           let ap = closestPoint - vl
                            let lenSq = Vec.dot ab ab
                            let t = if lenSq > 1e-5 then
                                        (Vec.dot ab ap) / lenSq
                                    else 
                                        0.0
     
-                           let projectedPoint = v0 + (clamp 0.0 1.0 t) * ab
+                           let projectedPoint = vl + (clamp 0.0 1.0 t) * ab
           
                            // check for projected point distance -> take closest
                            let dist = Vec.lengthSquared (projectedPoint - closestPoint)
                            if dist < smallestDist then
                                closestPointClamped <- projectedPoint
                                case <- if t > 0.001 && t < 0.999 then ClosestPointCase.Edge else ClosestPointCase.Vertex
-                               closestIndex <- if t > 0.999 then vc else vc - 1
+                               closestIndex <- if t > 0.999 then vc else vc-1
                                smallestDist <- dist
+                    else
+                        v00 <- v1
 
                     // set next vertex
+                    vl <- v1
                     let dir = v1.Normalized
                     set va.[vc].XYZ dir
                     set va.[vc].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
@@ -357,33 +367,36 @@ module Cubature =
             let hbn = vb.Z < -eps
             if (h0v && hbn || h0n && hbv) then
                 let v1 = (mix v0.XYZ vb.XYZ (v0.Z / (v0.Z - vb.Z)))
-                // clamp closest with edgewith edge
-                if vc > 0 then // (v1-vb)
-                    let edgePlaneN = (Vec.cross v1 vb)
+                // clamp closest point to new edge
+                if vc > 0 then // (vl-v1)
+                    let edgePlaneN = (Vec.cross vl v1)
                     let dotPlane = Vec.dot edgePlaneN closestPoint
     
                     // check if point is outside the polygon
                     if flipSng * dotPlane > -1e-9 then
                         
-                        let ab = vb - v1
-                        let ap = closestPoint - v1
+                        let ab = v1 - vl
+                        let ap = closestPoint - vl
                         let lenSq = Vec.dot ab ab
                         let t = if lenSq > 1e-5 then
                                     (Vec.dot ab ap) / lenSq
                                 else 
                                     0.0
     
-                        let projectedPoint = v1 + (clamp 0.0 1.0 t) * ab
+                        let projectedPoint = vl + (clamp 0.0 1.0 t) * ab
           
                         // check for projected point distance -> take closest
                         let dist = Vec.lengthSquared (projectedPoint - closestPoint)
                         if dist < smallestDist then
                             closestPointClamped <- projectedPoint
                             case <- if t > 0.001 && t < 0.999 then ClosestPointCase.Edge else ClosestPointCase.Vertex
-                            closestIndex <- if t > 0.999 then 0 else vc
+                            closestIndex <- if t > 0.999 then vc else vc-1
                             smallestDist <- dist
+                else    
+                    v00 <- v1
 
                 // set next vertex
+                vl <- v1
                 let dir = v1.Normalized
                 set va.[vc].XYZ dir
                 set va.[vc].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
@@ -391,6 +404,31 @@ module Cubature =
             
             let mutable color = V3d.Zero
             if vc > 2 then
+
+                // clamp closest point to last edge // (vl-v00)
+                let edgePlaneN = (Vec.cross vl v00)
+                let dotPlane = Vec.dot edgePlaneN closestPoint
+    
+                // check if point is outside the polygon
+                if flipSng * dotPlane > -1e-9 then
+                        
+                    let ab = v00 - vl
+                    let ap = closestPoint - vl
+                    let lenSq = Vec.dot ab ab
+                    let t = if lenSq > 1e-5 then
+                                (Vec.dot ab ap) / lenSq
+                            else 
+                                0.0
+    
+                    let projectedPoint = vl + (clamp 0.0 1.0 t) * ab
+          
+                    // check for projected point distance -> take closest
+                    let dist = Vec.lengthSquared (projectedPoint - closestPoint)
+                    if dist < smallestDist then
+                        closestPointClamped <- projectedPoint
+                        case <- if t > 0.001 && t < 0.999 then ClosestPointCase.Edge else ClosestPointCase.Vertex
+                        closestIndex <- if t > 0.999 then 0 else vc-1
+                        smallestDist <- dist
 
                 let closestPointDir = closestPointClamped |> Vec.normalize
     
