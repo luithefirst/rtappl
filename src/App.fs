@@ -151,7 +151,7 @@ module App =
                         |> Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
                                 //DefaultSurfaces.diffuseTexture |> toEffect
-                                (Cubature.cubature spec usePh) |> toEffect
+                                (Cubature.cubature_opt spec usePh) |> toEffect
                             ]
                     ) m.ltcSpecular m.usePhotometry)
 
