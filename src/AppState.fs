@@ -9,10 +9,11 @@ open Adaptify
 type ExposureMode = Manual=0 | MiddleGray=1 | Auto=2
     
 type RenderMode =
-    | Reference = 0
+    | Point = 0
     | Cubature = 1
-    | Difference = 2
-
+    //| CubatureOpt = 2
+    | Reference = 2
+    
 type ReferenceSamplingMode =
     | BRDF = 0
     | Light = 1
@@ -27,6 +28,7 @@ type Model =
     {
         // render settings
         renderMode      : RenderMode
+        difference      : bool
         ltcSpecular     : bool
 
         // light
@@ -58,6 +60,7 @@ type Message =
     // rendering settings
     | SetRenderMode of RenderMode
     | ToggleLTCSpecular
+    | ToggleDifferenceRender
     | ToggleAccumulation
     | SetSamplingMode of ReferenceSamplingMode
     | SetSampleCount of float

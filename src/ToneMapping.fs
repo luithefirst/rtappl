@@ -43,7 +43,7 @@ module ToneMapping =
     let private lumTexture =
         sampler2d {
             texture uniform?LumTexture
-            filter Filter.MinMagPoint
+            filter Filter.MinMagMipPoint
             addressU WrapMode.Wrap
             addressV WrapMode.Wrap
         }

@@ -203,3 +203,26 @@ module Reference =
 
             return V4d(L_d, prevFactor)
         }
+
+    let singlePoint (usePhotometry : bool) (v : Vertex) =
+        fragment {
+
+            let ex = uniform.Vertices.[1] - uniform.Vertices.[0]
+            let ey = uniform.Vertices.[3] - uniform.Vertices.[0]
+
+            let center = uniform.Vertices.[0] + (ex + ey) * 0.5
+
+            let lightVec = center - v.wp.XYZ
+            let lightDir = (center - v.wp.XYZ) |> Vec.normalize
+
+            let I = Photometry.getCubeIntensity_World -lightDir usePhotometry
+
+            let n = v.n |> Vec.normalize
+            let dotIn = Vec.dot n lightDir
+
+            let brdf = v.c.XYZ * Constant.PiInv
+
+            let Ld = brdf * I * dotIn / (lightVec.LengthSquared + 1e-7)
+
+            return V4d(Ld, 1.0)
+        }

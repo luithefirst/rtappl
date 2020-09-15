@@ -22,6 +22,7 @@ module App =
             
             | SetRenderMode rm -> { m with renderMode = rm }
             | ToggleLTCSpecular -> { m with ltcSpecular = not m.ltcSpecular }
+            | ToggleDifferenceRender -> { m with difference = not m.difference }
             | SetSampleCount sc -> { m with refSamplesPerFrame = int sc }
             | SetSamplingMode sm -> { m with refSamplingMode = sm }
             | ToggleAccumulation -> { m with refAccumulation = not m.refAccumulation }
@@ -48,7 +49,7 @@ module App =
                 // perform fake update for continuous rendering when in Reference or Difference render mode
                 // a dependency to clientValues.time is used, but it is only updated as long as any messages are processed
                 let m = 
-                    if m.renderMode = RenderMode.Reference || m.renderMode = RenderMode.Difference then 
+                    if m.renderMode = RenderMode.Reference || m.difference then 
                         match msg with 
                         | FreeFlyController.Rendered -> 
                             let fakeUpdate = m.cameraState.view.WithLocation(m.cameraState.view.Location)
@@ -70,6 +71,7 @@ module App =
         update {    
             // render settings
             renderMode = RenderMode.Cubature
+            difference = false
             ltcSpecular = false
 
             // light
@@ -144,16 +146,18 @@ module App =
             |> Sg.texture Photometry.IntensityTexture.Symbol texture
             |> Sg.texture Photometry.IntensityCube.Symbol textureCube
 
-    let withCubatureEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
+    let withApproximationEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
 
-        Sg.dynamic (AVal.map2 (fun spec usePh ->  
+        Sg.dynamic (AVal.map3 (fun spec usePh fx ->  
                     sceneGraph 
                         |> Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
                                 //DefaultSurfaces.diffuseTexture |> toEffect
-                                (Cubature.cubature_opt spec usePh) |> toEffect
+                                match fx with
+                                | RenderMode.Cubature -> (Cubature.cubature_opt spec usePh) |> toEffect // always use optimized shader
+                                | _ -> (Reference.singlePoint usePh) |> toEffect
                             ]
-                    ) m.ltcSpecular m.usePhotometry)
+                    ) m.ltcSpecular m.usePhotometry m.renderMode)
 
     let withReferenceEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
         
@@ -203,7 +207,7 @@ module App =
         let groundPlaneSg = Sg.ofIndexedGeometry planeGeometry
 
         let cubatureSg = Sg.ofList [ groundPlaneSg ]
-                            |> withCubatureEffect m
+                            |> withApproximationEffect m
 
         let referenceSg = Sg.ofList [ groundPlaneSg ]
                             |> withReferenceEffect m
@@ -235,7 +239,12 @@ module App =
                     h4 [style "color:white"] [text "Rendering"]                          
                     Html.table [
                         Html.row "Render Mode" [ dropdown1 [ clazz "ui inverted selection dropdown" ] renderModeValues m.renderMode SetRenderMode ]
-                        
+                        Html.row "Difference" [ simplecheckbox { 
+                            attributes [clazz "ui inverted toggle checkbox"; style "" ]
+                            state m.difference
+                            toggle ToggleDifferenceRender
+                        } ]
+
                         Html.row "LTC Specular" [ simplecheckbox { 
                                 attributes [clazz "ui inverted toggle checkbox"; style "" ]
                                 state m.ltcSpecular

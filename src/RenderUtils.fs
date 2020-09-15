@@ -230,6 +230,7 @@ module RenderUtils =
                 id
 
         let lumTex = RenderTask.custom(fun (self, rt, out) ->
+                                            let foo = clientValues.viewTrafo.GetValue(self) // fake dependecny to trigger rendering when scene changes -> otherwise task will not be run as the scene texture keeps the "same" (handle)
                                             lumInitTask.Run(rt, out)
                                             let outColorTex = out.framebuffer.Attachments.[DefaultSemantic.Colors] :?> BackendTextureOutputView
                                             clientValues.runtime.GenerateMipMaps(outColorTex.texture)
@@ -307,7 +308,7 @@ module RenderUtils =
             return V4d((lerp cTrue cFalse (error / (upp - low))), 1.0)
         }
 
-    let createRenderControl (m : AdaptiveModel) (cubatureSg : ISg<'a>) (referenceSg : ISg<'a>)= 
+    let createRenderControl (m : AdaptiveModel) (approxSg : ISg<'a>) (referenceSg : ISg<'a>)= 
 
         let frustum = AVal.constant (Frustum.perspective 60.0 0.1 100.0 1.0)
 
@@ -324,35 +325,37 @@ module RenderUtils =
         FreeFlyController.controlledControlWithClientValues m.cameraState CameraMessage frustum (AttributeMap.ofList [style "position: fixed; left: 0; top: 0; width: 100%; height: 100%"]) RenderControlConfig.standard 
             (fun clientValues -> 
                         
-                let cubatureSceneTex = createCubatureRenderTexture m clientValues cubatureSg
+                let approxSceneTex = createCubatureRenderTexture m clientValues approxSg
                 let referenceSceneTex = createReferenceRenderTexture m clientValues referenceSg
                            
-                let cubatureSg = createTonemapSg m clientValues cubatureSceneTex
+                let approxSg = createTonemapSg m clientValues approxSceneTex
                 let referenceSg = createTonemapSg m clientValues referenceSceneTex
 
-                Sg.dynamic (m.renderMode |> AVal.map (fun rm -> 
-                                                        match rm with
-                                                        | RenderMode.Cubature -> cubatureSg
-                                                        | RenderMode.Reference -> referenceSg
-                                                        | RenderMode.Difference -> 
-                                                        
-                                                            let cubatureTonemaped = 
-                                                                cubatureSg 
-                                                                    |> Sg.compile clientValues.runtime clientValues.signature
-                                                                    |> RenderTask.renderToColor clientValues.size
-
+                Sg.dynamic (m.difference |> AVal.map2 (fun rm diff -> 
+                                                        if diff then
                                                             let referenceTonemaped = 
                                                                 referenceSg
                                                                     |> Sg.compile clientValues.runtime clientValues.signature
                                                                     |> RenderTask.renderToColor clientValues.size
 
+                                                            let approxTonemaped = 
+                                                                if rm = RenderMode.Reference then
+                                                                    referenceTonemaped
+                                                                else
+                                                                    approxSg 
+                                                                        |> Sg.compile clientValues.runtime clientValues.signature
+                                                                        |> RenderTask.renderToColor clientValues.size
+
                                                             screenQuad
-                                                                |> Sg.uniform "ImageTest" (cubatureTonemaped :> aval<ITexture>)
+                                                                |> Sg.uniform "ImageTest" (approxTonemaped :> aval<ITexture>)
                                                                 |> Sg.uniform "ImageRef" (referenceTonemaped :> aval<ITexture>)
                                                                 |> Sg.shader {
                                                                         do! differenceEffect
                                                                     }
-                                                        | _ -> failwith "invalid render mode"
-                                                        ))
+                                                        elif rm = RenderMode.Reference then
+                                                            referenceSg
+                                                        else
+                                                            approxSg
+                                                    ) m.renderMode)
             )
                          
