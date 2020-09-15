@@ -32,7 +32,7 @@ The `Demo.exe` is built to `bin\Release\netcoreapp3.1\` and can be run from this
     + radiance initialization
 3. Cubature based on triangulation
 
-Updated GPU time of the shading pass measured in our benchmark framework on an RTX 2080 TI:
+Updated GPU time of the shading pass measured in our benchmark framework on a RTX 2080 TI:
 
 |              | 1080p  | 1440p  | 2160p  |
 | ------------ | ------ | ------ | ------ |
