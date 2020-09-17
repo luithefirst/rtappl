@@ -26,7 +26,7 @@ module Photometry =
 
     /// get photometry intensity from a C and gamma angles
     [<ReflectedDefinition>] [<Inline>]
-    let getIntensity (c : float, gamma : float) =
+    let getMapIntensity (c : float, gamma : float) =
 
         // Vertical angle: texture u coordinate
         let vert = gamma * Constant.PiInv // normalize to [0..1]
@@ -66,9 +66,9 @@ module Photometry =
 
     /// get photometry intensity from normalized direction vector
     [<ReflectedDefinition>] [<Inline>]
-    let getIntensity'(v : V3d) =
+    let getMapIntensity'(v : V3d) =
         let (c, gamma) = toCgamma v
-        getIntensity(c, gamma)
+        getMapIntensity(c, gamma)
 
 
     type UniformScope with
@@ -78,23 +78,23 @@ module Photometry =
 
     /// get photometry intensity from a normalized world direction with light transform and option to 
     [<ReflectedDefinition>] [<Inline>]
-    let getIntensity_World (i : V3d) (usePhotometry : bool) =
+    let getMapIntensity_World (i : V3d) (usePhotometry : bool) =
            
         if not usePhotometry then
             let forward = uniform.LightBasis.R2
             uniform.DiffuseExitance * (abs (Vec.dot i forward))
         else            
             let v = uniform.LightBasis * i
-            getIntensity' v
+            getMapIntensity' v
 
     [<ReflectedDefinition>] [<Inline>]
-    let getRadiance_World (i : V3d) (usePhotometry : bool) =
+    let getMapRadiance_World (i : V3d) (usePhotometry : bool) =
            
         if not usePhotometry then
             uniform.DiffuseExitance
         else            
             let v = uniform.LightBasis * i
-            let int = getIntensity' v
+            let int = getMapIntensity' v
             let dotOut = abs v.Z
             int / (dotOut + 1e-5)
 
@@ -137,4 +137,24 @@ module Photometry =
             let int = getCubeIntensity v
             let dotOut = abs v.Z
             int / (dotOut + 1e-5)
-            
+
+
+    ////////////////////////////////////////////
+    /// generic radiance and intensity lookup functions with internal switch to Cube or Map
+
+    [<ReflectedDefinition>] [<Inline>]
+    let getRadiance_World (i : V3d) (usePhotometry : bool) =
+        #if SPHEREMAP
+        getMapRadiance_World i usePhotometry // includes divisiion by dotOut
+        #else
+        getCubeRadiance_World i usePhotometry // includes divisiion by dotOut
+        #endif
+
+    /// get photometry intensity from a normalized world direction with light transform and option to 
+    [<ReflectedDefinition>] [<Inline>]
+    let getIntensity_World (i : V3d) (usePhotometry : bool) =
+        #if SPHEREMAP
+        getMapIntensity_World i usePhotometry
+        #else
+        getCubeIntensity_World i usePhotometry
+        #endif

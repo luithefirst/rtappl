@@ -32,15 +32,17 @@ module App =
             | TranslateLight t -> { m with transform = m.transform * Trafo3d.Translation(t) }
             | RotateLight r -> { m with transform = Trafo3d.RotationEuler(r) * m.transform }
             | LoadPhotometry fl -> 
-                let (data, name) = 
-                    try
-                        let data = LightMeasurementData.FromFile(fl |> Seq.head)
-                        let name = data.Name
-                        (Some data, Some name)
-                    with e -> 
-                        Log.warn "%A" e
-                        (None, None)
-                { m with photometryData = data; photometryName = name; usePhotometry = true }
+                if fl |> Seq.isEmpty then m
+                else
+                    let (data, name) = 
+                        try
+                            let data = LightMeasurementData.FromFile(fl |> Seq.head)
+                            let name = data.Name
+                            (Some data, Some name)
+                        with e -> 
+                            Log.warn "%A" e
+                            (None, None)
+                    { m with photometryData = data; photometryName = name; usePhotometry = true }
             | ResetPhotometry -> { m with photometryData = None; photometryName = None; usePhotometry = false }
             | ToggleUsePhotometry -> { m with usePhotometry = not m.usePhotometry }
             | SetDiffuseExitance d -> { m with diffuseExitance = d }
@@ -155,19 +157,19 @@ module App =
                                 //DefaultSurfaces.diffuseTexture |> toEffect
                                 match fx with
                                 | RenderMode.Cubature -> (Cubature.cubature_opt spec usePh) |> toEffect // always use optimized shader
-                                | _ -> (Reference.singlePoint usePh) |> toEffect
+                                | _ -> (Reference.singlePoint spec usePh) |> toEffect
                             ]
                     ) m.ltcSpecular m.usePhotometry m.renderMode)
 
     let withReferenceEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
         
-        Sg.dynamic (AVal.map2 (fun sampleMethod usePhotometry ->
+        Sg.dynamic (AVal.map3 (fun sampleMethod specular usePhotometry ->
                         sceneGraph 
                             |> Sg.effect [
                                 DefaultSurfaces.trafo |> toEffect
-                                (Reference.referenceLighting sampleMethod usePhotometry) |> toEffect
+                                (Reference.referenceLighting sampleMethod specular usePhotometry) |> toEffect
                             ]
-                    ) m.refSamplingMode m.usePhotometry)
+                    ) m.refSamplingMode m.ltcSpecular m.usePhotometry)
 
 
     let view (m : AdaptiveModel) =
@@ -183,11 +185,7 @@ module App =
                                 let P = V3d(v.wp)
                                 
                                 let dir = C - P |> Vec.normalize
-                                #if SPHEREMAP
                                 let i = Photometry.getRadiance_World dir uniform?UsePhotometry
-                                #else
-                                let i = Photometry.getCubeRadiance_World dir uniform?UsePhotometry
-                                #endif
 
                                 // add some intensity to light, so it is not completely dark in direction without emission
                                 return V4d(V3d(i + 5.0), 0.0) 
@@ -233,8 +231,8 @@ module App =
 
                 // sidebar 
                 div [style "position: fixed; width:260pt; margin:0px; border-radius:10px; padding:12px; background:DarkSlateGray; color: white; opacity: 0.2"; 
-                    clientEvent "onmouseenter" "$('#__ID__').animate({ opacity: 1.0 });";  
-                    clientEvent "onmouseleave" "$('#__ID__').animate({ opacity: 0.2 });" ] [
+                    (*clientEvent "onmouseenter" "$('#__ID__').animate({ opacity: 1.0 });";  
+                    clientEvent "onmouseleave" "$('#__ID__').animate({ opacity: 0.2 });" *)] [
                    
                     h4 [style "color:white"] [text "Rendering"]                          
                     Html.table [

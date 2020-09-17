@@ -82,12 +82,13 @@ module Reference =
                 else 
                     ((Vec.dot e2 qVec) * invDet)
 
-    let referenceLighting (samplingMethod : ReferenceSamplingMode) (usePhotometry : bool) (v : Vertex) = 
+    let referenceLighting (samplingMethod : ReferenceSamplingMode) (spec : bool) (usePhotometry : bool) (v : Vertex) = 
         fragment {
 
             let P = v.wp.XYZ
+            let n = v.n |> Vec.normalize // world-space normal
 
-            let t2w = v.n |> Vec.normalize |> EffectUtils.basisFrisvad_rev 
+            let t2w = n |> EffectUtils.basisFrisvad_rev 
             let w2t = t2w |> Mat.transpose
             
             // Compute a jitter
@@ -107,8 +108,6 @@ module Reference =
             // fallback to light sampling if solid angle is below threshold
             let useLight = samplingMethod = ReferenceSamplingMode.SolidAngle && squad.S < 1e-3 // NOTE: stability breaks down at 1e-4
         
-            let brdf = v.c.XYZ * Constant.PiInv
-
             for si in 0 .. uniform.SampleCount - 1 do
                    
                 let u = jitter + uniform.HaltonSamples.[si]
@@ -134,11 +133,7 @@ module Reference =
 
                         let worldI = t2w * -i
                                 
-                        #if SPHEREMAP
                         let Le = Photometry.getRadiance_World worldI usePhotometry // includes divisiion by dotOut
-                        #else
-                        let Le = Photometry.getCubeRadiance_World worldI usePhotometry // includes divisiion by dotOut
-                        #endif
 
                         let Le = Le / uniform.PolygonArea
 
@@ -156,11 +151,7 @@ module Reference =
                     if dotIn > 1e-7 then
 
                         let worldI = t2w * -sampleDir
-                        #if SPHEREMAP
                         let I = Photometry.getIntensity_World worldI usePhotometry
-                        #else
-                        let I = Photometry.getCubeIntensity_World worldI usePhotometry
-                        #endif
 
                         // PDf of area = 1 -> area to solid angle:
                         //let pdf = samplePointDistSqrd / (Area * dotOut)   |* Area |* dotOut
@@ -182,47 +173,139 @@ module Reference =
 
                     let dotIn = -(w2t * worldI).Z 
                     if dotIn > 1e-7 then  
-                        let dotOut = max 1e-9 (abs (Vec.dot worldI uniform.PolygonNormal))
-
-                        #if SPHEREMAP
                         let Le = Photometry.getRadiance_World worldI usePhotometry
-                        #else
-                        let Le = Photometry.getCubeRadiance_World worldI usePhotometry
-                        #endif
-
                         let Le = Le / uniform.PolygonArea
 
                         L_d <- L_d + (Le * dotIn) * invPdf
 
                 ()
 
-            let newAccumCount = float (uniform.AccumulatedSampleCount + uniform.SampleCount)
-            let L_d = brdf * (L_d / newAccumCount)
+            // diffuse brdf
+            let brdfDiff = v.c.XYZ * Constant.PiInv
+            let mutable L = L_d * brdfDiff
             
+            if spec then
+
+                let ks = V3d.III
+                let roughness = 0.1
+                let roughness = roughness * roughness // perceptional linear roughness to NDF parameter
+
+                let e = (uniform.CameraLocation - P) |> Vec.normalize // -eye vector
+                let e = w2t * e // tanget-space eye vector
+                
+                let dotVN = e.Z
+
+                if roughness = 0.0 then // perfect reflection
+
+                    let i = Vec.reflect V3d.OOI -e
+
+                    let t1 = rayTriangleIntersaction V3d.Zero i vt.[0] vt.[1] vt.[2]
+                    let mutable hitLight = t1 > 1e-8
+                    if not hitLight then
+                        let t2 = rayTriangleIntersaction V3d.Zero i vt.[0] vt.[2] vt.[3]
+                        hitLight <- t2 > 1e-8
+
+                    if hitLight then
+
+                        let worldI = t2w * -i
+                        let Le = Photometry.getRadiance_World worldI usePhotometry
+                        let Le = Le / uniform.PolygonArea
+
+                        // NOTE: GGX brdf in Cubature+LTC does not include Fresnel
+                        let brdfSpec = ks
+
+                        L <- L + Le * brdfSpec * float uniform.SampleCount
+                else
+                    
+                    for si in 0 .. uniform.SampleCount - 1 do
+                        let u = jitter + uniform.HaltonSamples.[si]
+                        let u = u - floor u
+                        let u1 = u.X
+                        let u2 = u.Y
+
+                        // TODO add refernce solution with hemisphere sampling
+                        // importance sample GGX distribution according to D (X distribution)
+                        //  -> random half-vector direction / micro-facet normal
+                        //let h = GGX.importanceSampleGGX roughness u1 u2
+                        //let h = GGX.importanceSampleGGX_VNDF roughness u1 u2 e
+                        let h = GGX.sampleGGXNdf roughness u1 u2
+                        let i = Vec.reflect h -e
+                        let dotIN = i.Z // (Vec.dot i n) in tangent space
+
+                        if dotIN > 1e-5 then
+
+                            let t1 = rayTriangleIntersaction V3d.Zero i vt.[0] vt.[1] vt.[2]
+                            let mutable hitLight = t1 > 1e-8
+                            if not hitLight then
+                                let t2 = rayTriangleIntersaction V3d.Zero i vt.[0] vt.[2] vt.[3]
+                                hitLight <- t2 > 1e-8
+
+                            if hitLight then
+
+                                let worldI = t2w * -i
+                        
+                                let Le = Photometry.getRadiance_World worldI usePhotometry // includes divisiion by dotOut
+                                let Le = Le / uniform.PolygonArea
+
+                                // NOTE: GGX brdf in Cubature+LTC does not include a Fresnel
+                                let G2 = GGX.G2_Smith roughness dotIN dotVN // geometry/shadow-masking term
+                                // as PDF=D -> canceld                                
+                                let brdfSpec = ks * G2 // / (4.0 * dotIN * dotVN) normalization term seems to included in the sampling pdf
+                                // sampleGGXNdf used with: "VdotH * NdotL * 4.f / NdotH" in source // TODO
+
+                                L <- L + Le * brdfSpec
+
+            
+
+            let newAccumCount = float (uniform.AccumulatedSampleCount + uniform.SampleCount)
+            let L = (L / newAccumCount)
+
             let prevFactor = (float)(uniform.AccumulatedSampleCount) / newAccumCount
 
-            return V4d(L_d, prevFactor)
+            return V4d(L, prevFactor)
         }
 
-    let singlePoint (usePhotometry : bool) (v : Vertex) =
+    let singlePoint (spec : bool) (usePhotometry : bool) (v : Vertex) =
         fragment {
 
             let ex = uniform.Vertices.[1] - uniform.Vertices.[0]
             let ey = uniform.Vertices.[3] - uniform.Vertices.[0]
 
-            let center = uniform.Vertices.[0] + (ex + ey) * 0.5
+            let lightPos = uniform.Vertices.[0] + (ex + ey) * 0.5
 
-            let lightVec = center - v.wp.XYZ
-            let lightDir = (center - v.wp.XYZ) |> Vec.normalize
+            let lightVec = lightPos - v.wp.XYZ
+            let lightDir = (lightPos - v.wp.XYZ) |> Vec.normalize
 
-            let I = Photometry.getCubeIntensity_World -lightDir usePhotometry
+            let I = Photometry.getIntensity_World -lightDir usePhotometry
 
             let n = v.n |> Vec.normalize
-            let dotIn = Vec.dot n lightDir
+            let dotIN = max 0.0 (Vec.dot n lightDir)
 
-            let brdf = v.c.XYZ * Constant.PiInv
+            let mutable Le = V3d.OOO
 
-            let Ld = brdf * I * dotIn / (lightVec.LengthSquared + 1e-7)
+            if dotIN > 0.0 then
+                let brdfDiff = v.c.XYZ * Constant.PiInv
 
-            return V4d(Ld, 1.0)
+                let Li = I * dotIN / (lightVec.LengthSquared + 1e-7)
+                Le <- brdfDiff * Li
+
+                if spec then
+                
+                    let ks = V3d.III
+                    let roughness = 0.1 // linear roughness
+
+                    let eyeDir = (uniform.CameraLocation - v.wp.XYZ) |> Vec.normalize
+                    let dotVN = Vec.dot eyeDir n
+
+                    if dotVN > 0.0 then
+                        let h = (eyeDir + lightDir) |> Vec.normalize // half-vector / micro-facet normal
+                        let dotHN = Vec.dot h n
+
+                        // NOTE: GGX brdf in Cubature+LTC does not include Fresnel
+                        let alpha = roughness * roughness // perceptional linear roughness to NDF parameter
+                        let brdfSpec = ks * GGX.GGX_Correlated alpha dotHN dotIN dotVN
+                
+                        Le <- Le + Li * brdfSpec
+
+            return V4d(Le, 1.0)
         }

@@ -143,11 +143,7 @@ module Cubature =
                 for i in 0..clippedVc-1 do
                     let dir = clippedVa.[i].XYZ |> Vec.normalize
                     let iw = -(mulT w2t dir) 
-                    #if SPHEREMAP
                     let Le = Photometry.getRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    #else
-                    let Le = Photometry.getCubeRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    #endif
                     set clippedVa.[i] (V4d(dir, Le))
         
                 // init triangle count: VertexCount in case of closest point is inside polygon
@@ -160,11 +156,7 @@ module Cubature =
                 if pointCase <> ClosestPointCase.Vertex then                    
                     let dir = closestPointDir
                     let iw = -(mulT w2t dir)
-                    #if SPHEREMAP
                     let Le = Photometry.getRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    #else
-                    let Le = Photometry.getCubeRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    #endif
                     v0 <- V4d(closestPointDir, Le)
                 else
                     v0 <- clippedVa.[i0]
@@ -272,7 +264,7 @@ module Cubature =
                 vl <- vb
                 let dir = vb.Normalized
                 set va.[0].XYZ dir
-                set va.[0].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
+                set va.[0].W (Photometry.getRadiance_World -(mulT w2t dir) usePhotometry)
                 vc <- 1
 
             let mutable v0 = vb
@@ -318,7 +310,7 @@ module Cubature =
                     vl <- ve
                     let dir = ve.Normalized
                     set va.[vc].XYZ dir
-                    set va.[vc].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
+                    set va.[vc].W (Photometry.getRadiance_World -(mulT w2t dir) usePhotometry)
                     vc <- vc + 1
             
                 if (v1.Z >= -eps) then 
@@ -355,7 +347,7 @@ module Cubature =
                     vl <- v1
                     let dir = v1.Normalized
                     set va.[vc].XYZ dir
-                    set va.[vc].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
+                    set va.[vc].W (Photometry.getRadiance_World -(mulT w2t dir) usePhotometry)
                     vc <- vc + 1
             
                 v0 <- v1
@@ -399,7 +391,7 @@ module Cubature =
                 vl <- v1
                 let dir = v1.Normalized
                 set va.[vc].XYZ dir
-                set va.[vc].W (Photometry.getCubeRadiance_World -(mulT w2t dir) usePhotometry)
+                set va.[vc].W (Photometry.getRadiance_World -(mulT w2t dir) usePhotometry)
                 vc <- vc + 1
             
             let mutable color = V3d.Zero
@@ -442,11 +434,7 @@ module Cubature =
                 if case <> ClosestPointCase.Vertex then                    
                     let dir = closestPointDir
                     let iw = -(mulT w2t dir)
-                    #if SPHEREMAP
                     let Le = Photometry.getRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    #else
-                    let Le = Photometry.getCubeRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    #endif
                     v0 <- V4d(closestPointDir, Le)
                 else
                     v0 <- va.[closestIndex]
@@ -477,7 +465,7 @@ module Cubature =
                         let Le = Ld / denom
     
                         let ks = V3d.III
-                        let roughness = 0.1
+                        let roughness = 0.1 // "linear" roughness instead of trowbridge-reitz parameter ?? -> assume so, as Point shader matches then
                                                                 
                         let ltcSpec = LTC.evalLTCSpec P w2t roughness dotNV uniform.Vertices uniform.VertexCount
                                         

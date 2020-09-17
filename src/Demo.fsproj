@@ -20,6 +20,7 @@
     <Compile Include="ToneMapping.fs" />
     <Compile Include="LTC.fs" />
     <Compile Include="Cubature.fs" />
+    <Compile Include="GGX.fs" />
     <Compile Include="Reference.fs" />
     <Compile Include="RenderUtils.fs" />
     <Compile Include="App.fs" />
