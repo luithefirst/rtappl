@@ -126,6 +126,12 @@ module App =
                                                                     // Z-up (DirectX) to Y-up (OpenGL)
                                                                     // XN YP XP YN ZP ZN -> XP XN ZN ZP YP YN 
                                                                     //  -> in shader use (X, -Z, Y) to perform lookup
+                                                                    //cubeFaces.[0].MipArray.[0].ToPixImage<float32>().ToPixImage(Col.Format.RGB).SaveAsImage("C:\\Debug\\XN.exr") // crashes without Gray to RGB conversion
+                                                                    //cubeFaces.[1].MipArray.[0].ToPixImage<float32>().ToPixImage(Col.Format.RGB).SaveAsImage("C:\\Debug\\YP.exr")
+                                                                    //cubeFaces.[2].MipArray.[0].ToPixImage<float32>().ToPixImage(Col.Format.RGB).SaveAsImage("C:\\Debug\\XP.exr")
+                                                                    //cubeFaces.[3].MipArray.[0].ToPixImage<float32>().ToPixImage(Col.Format.RGB).SaveAsImage("C:\\Debug\\YN.exr")
+                                                                    //cubeFaces.[4].MipArray.[0].ToPixImage<float32>().ToPixImage(Col.Format.RGB).SaveAsImage("C:\\Debug\\ZP.exr")
+                                                                    //cubeFaces.[5].MipArray.[0].ToPixImage<float32>().ToPixImage(Col.Format.RGB).SaveAsImage("C:\\Debug\\ZN.exr")
                                                                     let cubeFaces = [| cubeFaces.[2]; cubeFaces.[0]; cubeFaces.[5]; cubeFaces.[4]; cubeFaces.[1]; cubeFaces.[3] |]
                                                                     let imgCube = PixImageCube(cubeFaces |> Array.map (fun x -> PixImageMipMap(x.MipArray.[0].ToPixImage())))
                                                                     PixTextureCube(imgCube, true) :> ITexture // wantMipMaps = true -> Future work: use mip bias to smoothen illuminaiton in near-field
@@ -230,7 +236,7 @@ module App =
                 renderControl
 
                 // sidebar 
-                div [style "position: fixed; width:260pt; margin:0px; border-radius:10px; padding:12px; background:DarkSlateGray; color: white; opacity: 0.2"; 
+                div [style "position: fixed; width:260pt; margin:0px; border-radius:10px; padding:12px; background:DarkSlateGray; color: white; opacity: 0.9"; 
                     (*clientEvent "onmouseenter" "$('#__ID__').animate({ opacity: 1.0 });";  
                     clientEvent "onmouseleave" "$('#__ID__').animate({ opacity: 0.2 });" *)] [
                    
