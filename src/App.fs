@@ -116,10 +116,12 @@ module App =
         let polygonVertexCount = m.polygon |> AVal.map (fun p -> p.PointCount)
         let polygonArea = m.polygon |> AVal.map (fun p -> p.ComputeArea())
 
+        // photometry data in 2d texture with spherical paramterization and shader uniforms for lookup
         let addressing = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> x.AddressingParameters) |> Option.defaultValue V4f.Zero)
         let offsetScale = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> x.ImageOffsetScale) |> Option.defaultValue V4f.Zero)
         let texture = sampler |> AVal.map (fun x -> x |> Option.map (fun x -> PixTexture2d(PixImageMipMap(x.Image), false) :> ITexture) |> Option.defaultValue (NullTexture() :> ITexture))
 
+        // photometry data as cube map texture
         let textureCube = sampler |> AVal.map (fun x -> x |> Option.map (fun sam -> 
                                                                     let cube = sam.GetCubeTexture()
                                                                     let cubeFaces = cube.MipMapArray

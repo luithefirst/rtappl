@@ -21,12 +21,12 @@ module Photometry =
            }
 
     type UniformScope with
-        member x.ProfileAddressing  : V4d  = x?ProfileAddressing
-        member x.TextureOffsetScale : V4d  = x?TextureOffsetScale 
+        member x.ProfileAddressing  : V4d  = x?ProfileAddressing // horizontal and vertical symmetry addressing parameters
+        member x.TextureOffsetScale : V4d  = x?TextureOffsetScale // texture coordinate offsets/scales for texel addressing
 
-    /// get photometry intensity from a C and gamma angles
+    /// get photometry intensity from C and gamma angles
     [<ReflectedDefinition>] [<Inline>]
-    let getMapIntensity (c : float, gamma : float) =
+    let getMapIntensity (c : float) (gamma : float) =
 
         // Vertical angle: texture u coordinate
         let vert = gamma * Constant.PiInv // normalize to [0..1]
@@ -60,7 +60,7 @@ module Photometry =
     /// C-gamma coordinates
     /// c = [0, 2pi], gamma = [0, pi]
     [<ReflectedDefinition>] [<Inline>]
-    let toDir (c : float, gamma : float) =
+    let toDir (c : float) (gamma : float) =
         let s = sin gamma
         V3d((cos c) * s, (sin c) * s, - cos gamma)
 
@@ -68,7 +68,7 @@ module Photometry =
     [<ReflectedDefinition>] [<Inline>]
     let getMapIntensity'(v : V3d) =
         let (c, gamma) = toCgamma v
-        getMapIntensity(c, gamma)
+        getMapIntensity c gamma
 
 
     type UniformScope with
