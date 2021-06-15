@@ -139,42 +139,73 @@ module Cubature =
                 let (closestPointClamped, i0, pointCase) = clampPointToPolygon_withCase clippedVa clippedVc ccw closestPoint
                 let closestPointDir = closestPointClamped |> Vec.normalize
     
-                // normalize vectors and init intensities
-                for i in 0..clippedVc-1 do
-                    let dir = clippedVa.[i].XYZ |> Vec.normalize
-                    let iw = -(mulT w2t dir) 
-                    let Le = Photometry.getRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    set clippedVa.[i] (V4d(dir, Le))
-        
                 // init triangle count: VertexCount in case of closest point is inside polygon
                 //                      VertexCount-1 triangles in case of edge
                 //                      VertexCount-2 triangles in case of corner
-                let tc = clippedVc - (int)pointCase 
+                let tc = clippedVc - (int)pointCase
                         
-                // init fixed vertex data of triangle fan
-                let mutable v0 = Unchecked.defaultof<_>
-                if pointCase <> ClosestPointCase.Vertex then                    
-                    let dir = closestPointDir
-                    let iw = -(mulT w2t dir)
-                    let Le = Photometry.getRadiance_World iw usePhotometry // note: includes 1/dotOut
-                    v0 <- V4d(closestPointDir, Le)
-                else
-                    v0 <- clippedVa.[i0]
-                        
+                // false: equal weighting like in paper
+                // true: weight by dotOut -> slightly higher NRMS error, but more robust in extreme near-field cases
+                let dotOutWeight = true
+
+                // init fixed vertex data of triangle fan v0
+                let v0 = 
+                    if pointCase <> ClosestPointCase.Vertex then                    
+                        closestPointDir
+                    else
+                        clippedVa.[i0].XYZ |> Vec.normalize
+
+                let iw = -(mulT w2t v0)
+                let v0out = abs (Vec.dot uniform.PolygonNormal iw)
+                let mutable v0Le = Photometry.getIntensity_World iw usePhotometry
+                if not dotOutWeight then
+                    v0Le <- v0Le / v0out
+
+                // init 2nd vertex of first triangle v1
+                let i1 = (i0 + 1) % clippedVc
+
+                let mutable v1 = clippedVa.[i1].XYZ |> Vec.normalize
+                let iw = -(mulT w2t v1)
+                let mutable v1out = abs (Vec.dot uniform.PolygonNormal iw)
+                let mutable v1Le = Photometry.getIntensity_World iw usePhotometry
+                if not dotOutWeight then
+                    v1Le <- v1Le / v1out
+
                 let mutable denom = 0.0
                 let mutable Ld = 0.0
-                    
+                
                 for i in 1..tc do
-                    let i1 = (i0 + i) % clippedVc
                     let i2 = (i0 + i+1) % clippedVc
-                                
-                    let sphEx = computeSolidAngle_Norm v0.XYZ clippedVa.[i1].XYZ clippedVa.[i2].XYZ
-                              
-                    let avgLe = (v0.W + clippedVa.[i1].W + clippedVa.[i2].W) / 3.0
-                    let avgG = (v0.Z + clippedVa.[i1].Z + clippedVa.[i2].Z) / 3.0
+                
+                    // init 3rd vertex of triangle v2
+                    let v2 = clippedVa.[i2].XYZ |> Vec.normalize
+                    let iw = -(mulT w2t v2)
+                    let v2out = abs (Vec.dot uniform.PolygonNormal iw)
+                    let mutable v2Le = Photometry.getIntensity_World iw usePhotometry
+                    if not dotOutWeight then
+                        v2Le <- v2Le / v2out
+
+                    let sphEx = computeSolidAngle_Norm v0 v1 v2
+                    
+                    let mutable avgLe = Unchecked.defaultof<_>
+                    let mutable avgG =  Unchecked.defaultof<_>
+
+                    if dotOutWeight then
+                        let outNorm = 1.0 / (v0out + v1out + v2out)
+                        avgLe <- (v0Le + v1Le + v2Le) * outNorm
+                        avgG <- (v0.Z * v0out + v1.Z * v1out + v2.Z * v2out) * outNorm
+                    else
+                        avgLe <- (v0Le + v1Le + v2Le) / 3.0
+                        avgG <- (v0.Z + v1.Z + v2.Z) / 3.0
+                    
                     let G = sphEx * avgG
                     Ld <- Ld + avgLe * G
                     denom <- denom + G
+
+                    // step to next triangle
+                    v1 <- v2
+                    v1out <- v2out
+                    v1Le <- v2Le
                             
                 if Ld > 0.0 then 
     

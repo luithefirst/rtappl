@@ -164,7 +164,7 @@ module App =
                                 DefaultSurfaces.trafo |> toEffect
                                 //DefaultSurfaces.diffuseTexture |> toEffect
                                 match fx with
-                                | RenderMode.Cubature -> (Cubature.cubature_opt spec usePh) |> toEffect // always use optimized shader
+                                | RenderMode.Cubature -> (Cubature.cubature spec usePh) |> toEffect // always use optimized shader
                                 | _ -> (Reference.singlePoint spec usePh) |> toEffect
                             ]
                     ) m.ltcSpecular m.usePhotometry m.renderMode)
