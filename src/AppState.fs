@@ -11,9 +11,13 @@ type ExposureMode = Manual=0 | MiddleGray=1 | Auto=2
 type RenderMode =
     | Point = 0
     | Cubature = 1
-    //| CubatureOpt = 2
     | Reference = 2
-    
+
+type CubatureWeighting =
+    | Sample = 0       // original derivation from photometric light rendering equation (Eq. 9)
+    | SplitAverage = 1 // split product of average luminance and average geometric term (Eg. 10)
+    | SplitDotOut = 2  // split product of dotOut weighted average luminance and geometric term: marginal higher error / improved robustness in extreme near-field cases
+        
 type ReferenceSamplingMode =
     | BRDF = 0
     | Light = 1
@@ -27,9 +31,10 @@ type LightTransformMode =
 type Model =
     {
         // render settings
-        renderMode      : RenderMode
-        difference      : bool
-        ltcSpecular     : bool
+        renderMode        : RenderMode
+        difference        : bool
+        ltcSpecular       : bool
+        cubatureWeighting : CubatureWeighting
 
         // light
         transform           : Trafo3d
@@ -59,6 +64,7 @@ type Message =
     
     // rendering settings
     | SetRenderMode of RenderMode
+    | SetCubatureWeighting of CubatureWeighting
     | ToggleLTCSpecular
     | ToggleDifferenceRender
     | ToggleAccumulation

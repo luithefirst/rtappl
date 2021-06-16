@@ -12,6 +12,7 @@
     <OutputPath>..\bin\Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Semui-overrides.css" />
     <Compile Include="SphericalQuad.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="AppState.fs" />

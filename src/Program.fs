@@ -16,8 +16,10 @@ module Main =
 
         let app = new OpenGlApplication()
 
+        let resAssembly = System.Reflection.Assembly.GetEntryAssembly()
         WebPart.startServerLocalhost 4321 [
             MutableApp.toWebPart' app.Runtime false (App.start App.app)
+            Reflection.assemblyWebPart resAssembly
         ] |> ignore
     
         Aardium.run {

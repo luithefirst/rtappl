@@ -1,0 +1,11 @@
+.ui.table td {
+  padding: 0.50em 0.50em;
+}
+
+.ui.inverted.selection.dropdown {
+    min-width: 11em;
+}
+
+.ui.inverted.toggle.checkbox.ui.checkbox {
+    padding: 0.50em 0.0em;
+}

@@ -21,12 +21,13 @@ module App =
         match msg with
             
             | SetRenderMode rm -> { m with renderMode = rm }
+            | SetCubatureWeighting cw -> { m with cubatureWeighting = cw }
             | ToggleLTCSpecular -> { m with ltcSpecular = not m.ltcSpecular }
             | ToggleDifferenceRender -> { m with difference = not m.difference }
             | SetSampleCount sc -> { m with refSamplesPerFrame = int sc }
             | SetSamplingMode sm -> { m with refSamplingMode = sm }
             | ToggleAccumulation -> { m with refAccumulation = not m.refAccumulation }
-
+            
             | ResetLightTransform -> { m with transform = initLightTransform }
             | ChangeLightTransformMode tm -> { m with transformMode = tm }
             | TranslateLight t -> { m with transform = m.transform * Trafo3d.Translation(t) }
@@ -75,6 +76,7 @@ module App =
             renderMode = RenderMode.Cubature
             difference = false
             ltcSpecular = false
+            cubatureWeighting = CubatureWeighting.SplitAverage
 
             // light
             transform       = initLightTransform
@@ -158,16 +160,22 @@ module App =
 
     let withApproximationEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
 
-        Sg.dynamic (AVal.map3 (fun spec usePh fx ->  
-                    sceneGraph 
-                        |> Sg.effect [
-                                DefaultSurfaces.trafo |> toEffect
-                                //DefaultSurfaces.diffuseTexture |> toEffect
-                                match fx with
-                                | RenderMode.Cubature -> (Cubature.cubature spec usePh) |> toEffect // always use optimized shader
-                                | _ -> (Reference.singlePoint spec usePh) |> toEffect
-                            ]
-                    ) m.ltcSpecular m.usePhotometry m.renderMode)
+        Sg.dynamic (adaptive {
+
+                        let! spec = m.ltcSpecular
+                        let! usePh = m.usePhotometry
+                        let! fx = m.renderMode
+                        let! weighting = m.cubatureWeighting
+
+                        return sceneGraph 
+                            |> Sg.effect [
+                                        DefaultSurfaces.trafo |> toEffect
+                                        //DefaultSurfaces.diffuseTexture |> toEffect
+                                        match fx with
+                                        | RenderMode.Cubature -> (Cubature.cubature spec usePh weighting) |> toEffect
+                                        | _ -> (Reference.singlePoint spec usePh) |> toEffect
+                                    ]
+                    })
 
     let withReferenceEffect (m : AdaptiveModel) (sceneGraph : ISg<'a>) =
         
@@ -231,8 +239,12 @@ module App =
         let renderModeValues = enumValuesToDomNodes (fun (rm : RenderMode) -> text (Enum.GetName(typeof<RenderMode>, rm)))
         let exposureModeValues = enumValuesToDomNodes (fun (em : ExposureMode) -> text (Enum.GetName(typeof<ExposureMode>, em)))
         let samplingModeValues = enumValuesToDomNodes (fun (sm : ReferenceSamplingMode) -> text (Enum.GetName(typeof<ReferenceSamplingMode>, sm)))
+        let weightingValues = enumValuesToDomNodes (fun (sm : CubatureWeighting) -> text (Enum.GetName(typeof<CubatureWeighting>, sm)))
 
-        require Html.semui (
+        let overrides = { kind = Stylesheet; name = "semui-overrides"; url = "../Semui-overrides.css" }
+        let numberInputStyle = style "width: 11em"
+
+        require (Html.semui @ [overrides]) (
             body [] [
 
                 renderControl
@@ -257,9 +269,11 @@ module App =
                                 toggle ToggleLTCSpecular
                             } ]
 
+                        Html.row "Cubature Weighting" [ dropdown1 [ clazz "ui inverted selection dropdown"] weightingValues m.cubatureWeighting SetCubatureWeighting ]
+
                         Html.row "Sampling Mode" [ dropdown1 [ clazz "ui inverted selection dropdown" ] samplingModeValues m.refSamplingMode SetSamplingMode ]
 
-                        Html.row "Sample Count" [ simplenumeric { attributes [clazz "ui inverted input"]; value (m.refSamplesPerFrame |> AVal.map(fun sc -> float sc)); update SetSampleCount; step 1.0; largeStep 1.0; min 1.0; max 64.0; }]
+                        Html.row "Sample Count" [ simplenumeric { attributes [clazz "ui inverted input"; numberInputStyle]; value (m.refSamplesPerFrame |> AVal.map(fun sc -> float sc)); update SetSampleCount; step 1.0; largeStep 1.0; min 1.0; max 64.0; }]
 
                         Html.row "Accumulation" [ simplecheckbox { 
                                 attributes [clazz "ui inverted toggle checkbox"; style "" ]
@@ -352,8 +366,8 @@ module App =
                     h4 [style "color:white"] [text "Tonemapping"]
                     Html.table [
                         Html.row "Mode" [ dropdown1 [ clazz "ui inverted selection dropdown" ] exposureModeValues m.exposureMode SetExposureMode ]
-                        Html.row "Exposure" [ simplenumeric { attributes [clazz "ui inverted input"]; value m.exposure; update SetExposure; step 0.1; largeStep 1.0; min -20.0; max 10.0; }]
-                        Html.row "Middle Gray" [ simplenumeric { attributes [clazz "ui inverted input"]; value m.key; update SetKey; step 0.001; largeStep 0.01; min 0.001; max 1.0; }]
+                        Html.row "Exposure" [ simplenumeric { attributes [clazz "ui inverted input"; numberInputStyle]; value m.exposure; update SetExposure; step 0.1; largeStep 1.0; min -20.0; max 10.0; }]
+                        Html.row "Middle Gray" [ simplenumeric { attributes [clazz "ui inverted input"; numberInputStyle]; value m.key; update SetKey; step 0.001; largeStep 0.01; min 0.001; max 1.0; }]
                         ]
                 ]
 

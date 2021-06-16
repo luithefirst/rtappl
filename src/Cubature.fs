@@ -95,7 +95,7 @@ module Cubature =
     (*
         main shading procedure of our cubature technique
     *)
-    let cubature (ltcSpecular : bool) (usePhotometry : bool) (v : Vertex) = 
+    let cubature (ltcSpecular : bool) (usePhotometry : bool) (cubatureWeighting : CubatureWeighting) (v : Vertex) = 
         fragment {
     
             let mutable P = v.wp.XYZ
@@ -158,7 +158,7 @@ module Cubature =
                 let iw = -(mulT w2t v0)
                 let v0out = abs (Vec.dot uniform.PolygonNormal iw)
                 let mutable v0Le = Photometry.getIntensity_World iw usePhotometry
-                if not dotOutWeight then
+                if cubatureWeighting <> CubatureWeighting.SplitDotOut then
                     v0Le <- v0Le / v0out
 
                 // init 2nd vertex of first triangle v1
@@ -168,7 +168,7 @@ module Cubature =
                 let iw = -(mulT w2t v1)
                 let mutable v1out = abs (Vec.dot uniform.PolygonNormal iw)
                 let mutable v1Le = Photometry.getIntensity_World iw usePhotometry
-                if not dotOutWeight then
+                if cubatureWeighting <> CubatureWeighting.SplitDotOut then
                     v1Le <- v1Le / v1out
 
                 let mutable denom = 0.0
@@ -182,26 +182,28 @@ module Cubature =
                     let iw = -(mulT w2t v2)
                     let v2out = abs (Vec.dot uniform.PolygonNormal iw)
                     let mutable v2Le = Photometry.getIntensity_World iw usePhotometry
-                    if not dotOutWeight then
+                    if cubatureWeighting <> CubatureWeighting.SplitDotOut then
                         v2Le <- v2Le / v2out
 
                     let sphEx = computeSolidAngle_Norm v0 v1 v2
                     
-                    let mutable avgLe = Unchecked.defaultof<_>
-                    let mutable avgG =  Unchecked.defaultof<_>
-
-                    if dotOutWeight then
+                    if cubatureWeighting = CubatureWeighting.SplitDotOut then
                         let outNorm = 1.0 / (v0out + v1out + v2out)
-                        avgLe <- (v0Le + v1Le + v2Le) * outNorm
-                        avgG <- (v0.Z * v0out + v1.Z * v1out + v2.Z * v2out) * outNorm
-                    else
-                        avgLe <- (v0Le + v1Le + v2Le) / 3.0
-                        avgG <- (v0.Z + v1.Z + v2.Z) / 3.0
+                        let avgLe = (v0Le + v1Le + v2Le) * outNorm
+                        let avgG = (v0.Z * v0out + v1.Z * v1out + v2.Z * v2out) * outNorm
+                        let G = sphEx * avgG
+                        Ld <- Ld + avgLe * G
+                        denom <- denom + G
+                    elif cubatureWeighting = CubatureWeighting.SplitAverage then
+                        let avgLe = (v0Le + v1Le + v2Le) / 3.0
+                        let avgG = (v0.Z + v1.Z + v2.Z) / 3.0
+                        let G = sphEx * avgG
+                        Ld <- Ld + avgLe * G
+                        denom <- denom + G
+                    else // cubatureWeighting = CubatureWeighting.Sample
+                        Ld <- Ld + sphEx * (v0Le * v0.Z + v1Le * v1.Z + v2Le * v2.Z) / 3.0
+                        denom <- denom + sphEx * (v0.Z + v1.Z + v2.Z)
                     
-                    let G = sphEx * avgG
-                    Ld <- Ld + avgLe * G
-                    denom <- denom + G
-
                     // step to next triangle
                     v1 <- v2
                     v1out <- v2out
